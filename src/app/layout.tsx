@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Inter } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/utils/cn';
+import { ThemeProvider } from '@/components/providers/theme-provider';
+import { TanstackProvider } from '@/components/providers/tanstack-provider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -36,8 +38,18 @@ export default function RootLayout({
                 'font-sans',
                 inter.variable,
             )}
+            suppressHydrationWarning
         >
-            <body className="flex min-h-full flex-col">{children}</body>
+            <body className="flex min-h-full flex-col">
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    <TanstackProvider>{children}</TanstackProvider>
+                </ThemeProvider>
+            </body>
         </html>
     );
 }
