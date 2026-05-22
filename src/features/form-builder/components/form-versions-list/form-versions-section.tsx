@@ -8,8 +8,8 @@ export default function FormVersionsSection({
     children,
 }: FormVersionsSectionProps) {
     return (
-        <section className="space-y-3">
-            <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+        <section className="space-y-2.5">
+            <h2 className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
                 {label}
             </h2>
             {children}

@@ -20,7 +20,7 @@ and *which conventions we've committed to as we build*.
 | 5  | Query keys + TanStack hooks             | ✅ done           |
 | 6  | Builder utilities                       | ✅ done           |
 | 7  | Versions list page                      | ✅ done           |
-| 7.5| Design-language pass (interim)          | pending           |
+| 7.5| Design-language pass (interim)          | ✅ done           |
 | 8  | Draft editor (shell, rename, CRUD)      | pending           |
 | 9  | Prerequisite editor                     | pending           |
 | 10 | Publish + checkout dialogs              | pending           |
@@ -157,7 +157,7 @@ other component sits in a single-purpose subfolder.
   by the Active badge above. The current section's banner is the
   source of truth for the retry. The duplication self-heals.
 - **No `format-published-date` util.** `date-fns` is already in the
-  project; `format(new Date(createdAt * 1000), 'MMM d, yyyy')` is
+  project; `format(new Date(createdAt), 'MMM d, yyyy')` is
   inlined at the two call sites. A four-line wrapper failed the
   "three similar lines beats premature abstraction" test.
 - **Folder naming is singular**: `error/`, `empty-state/`,
@@ -215,90 +215,119 @@ runs clean.
 
 ---
 
-### Commit 7.5 — design-language pass (pending)
+### Commit 7.5 — closed
 
-Interim polish pass between commit 7 and commit 8. The functional
-versions list is in, but the visual language is generic
-shadcn-template aesthetic — rounded-xl cards with rings, uppercase
-muted section labels, dashed-border empty states, no hover
-treatment on the current-version card. Goal of this pass is to set
-the design language *once* so commits 8–11 inherit it and commit
-12 becomes consistency cleanup rather than redesign.
+Visual-only pass anchoring the design vocabulary commits 8–11
+inherit. No behavioural changes; no shifts to the
+three-sibling-sections decomposition from commit 7.
 
-**Reference quality bar:** GitHub, Linear, Vercel dashboards.
-Sturdy, learnable in one sitting, never punishes a mistake. Quiet
-palette, loud accents. Typography is the primary hierarchy device;
-chrome is restrained.
+**Resolved open questions:**
 
-**Scope of the pass:**
+- **Sections + rows, or one unified list?** Sections kept. The
+  three sibling sections (current / draft / previously published)
+  stay; the row shape inside each is unified so the page reads as
+  one visual language with three labelled groups.
+- **Section labels: keep, restyle, or drop?** Kept uppercase
+  muted, tightened only. Bumped from `text-xs font-medium` to
+  `text-sm font-semibold tracking-wide`. The sentence-case
+  alternative was considered and rejected — uppercase muted reads
+  as a quiet category label, the sentence-case version competed
+  visually with the row titles below it.
+- **Active badge: dot, text, or both?** Dot + label, inline with
+  the form name. `size-1.5 rounded-full bg-success` dot followed
+  by "Active" in `text-muted-foreground text-xs font-medium`.
+  Uses the `--success` theme token so light/dark track
+  automatically. Replaces the off-palette custom emerald pill.
 
-1. **Unify section visual language.** Today current/draft cards
-   use `rounded-xl` card chrome with a ring, and the
-   previously-published list uses divided rows in a bordered
-   container — two visual languages on the same page. Collapse to
-   one: either every version is a row in a single list (current
-   marked Active, draft as a row with a primary CTA), or keep
-   sections but apply the same row treatment within each.
-2. **Section labels.** Drop uppercase muted h2 in favour of
-   sentence-case semibold at a slightly larger weight — or omit
-   labels entirely if the rows are self-descriptive (current's
-   Active badge, draft's CTA).
-3. **Card chrome density.** Replace shadcn's default
-   `rounded-xl` + `ring-1` + `shadow-xs` with thin `border` only,
-   no ring, no shadow. Grouping comes from spacing and subtle
-   background contrast (`bg-muted/30` or similar), not chrome.
-4. **Badge refinement.** Tighten the Active badge — size, tracking,
-   palette alignment with the rest of the design system. Today's
-   custom emerald is fine but slightly off-palette.
-5. **Hover and focus.** Every navigable row/card gets a
-   `hover:bg-muted/50` (or similar) + `focus-visible` treatment.
-   Optionally a leading-edge accent. End-to-end keyboard navigation
-   should feel as good as mouse.
-6. **Skeletons match content shape.** Replace generic
-   `h-24 w-full` rectangles with placeholders that mirror the
-   eventual row (title bar + caption + badge slot). No reflow on
-   first paint.
-7. **Empty-state visual language.** Move away from dashed borders.
-   Lean on neutral surfaces + icon + tight spacing, in line with
-   the rest of the design.
-8. **Typography rhythm.** Tighten heading leading/tracking;
-   normalise description color stop; standardise body vs metadata
-   sizes across components. One table of typographic intents,
-   applied consistently.
-9. **Iconography.** Normalise icon sizes against text baselines.
-   `size-3.5` / `size-4` / `size-5` used intentionally, not
-   incidentally.
+**Row vocabulary (applies to current, draft, previous rows):**
 
-**Out of scope for the design-language pass:**
+- Container: `<Card className="gap-0 p-0">` for single-row
+  sections; `<Card className="divide-border gap-0 divide-y p-0">`
+  for the divided list. The `gap-0 p-0` overrides neutralise
+  Card's vertical-stack defaults so the inner Link drives row
+  paddings.
+- Row: `<Link>` wraps the entire row. Classes:
+  `group flex items-center gap-4 px-4 py-3.5
+  hover:bg-muted/40 focus-visible:bg-muted/40
+  focus-visible:outline-ring/60 focus-visible:outline-2
+  focus-visible:-outline-offset-2 transition-colors`.
+- Content: `min-w-0 flex-1 space-y-1`. Title row is
+  `text-sm font-medium` (truncated on overflow); meta row is
+  `text-muted-foreground text-xs` formatted as
+  `Version {v} · Published {date}`.
+- Trailing affordance: `ChevronRight size-4` in
+  `text-muted-foreground/60 group-hover:text-muted-foreground
+  transition-colors`. The draft row swaps the chevron for an
+  inline `text-primary` "Edit draft" + `PencilLine size-3.5`
+  with `group-hover:underline` — no nested Button, since the
+  whole row is already a Link.
 
-- New feature work or behavioural changes. This is a visual pass
-  only.
-- Reworking the underlying component decomposition. The
-  three-sibling-sections shape stays; only its visual treatment
-  changes.
-- Animation work beyond simple `transition-colors` for hover.
-- Dark-mode-specific design beyond what the existing tokens
-  cover.
+**Empty-state vocabulary:**
 
-**How this changes the downstream commits:**
+- Full shadcn primitive composition: `Card` + `CardHeader` +
+  `CardTitle` + `CardDescription`. Leading icon goes **inside**
+  `CardTitle` via `className="flex items-center gap-2"`. Icon is
+  `size-5 text-muted-foreground`.
+- Applies to `NoCurrentFormEmptyState` and
+  `PreviousVersionsEmptyState`. `UgandaProgramEmptyState` already
+  used this composition in commit 7 and stays untouched.
+- The dashed-border + center-aligned variant from commit 7 is
+  retired.
 
-- Commits 8–11 build on the established design language.
-  `<QuestionCard>`, `<QuestionDrawer>`, `<PrerequisiteEditor>`,
-  the publish/checkout dialogs, and the historical viewer all
-  inherit the spec set here.
-- Commit 12 becomes "consistency cleanup" — audit every surface
-  against the language, fix drift, finalise a11y. No design
-  invention at commit 12.
+**Page shell rhythm:**
 
-**Open questions for the pass:**
+- Outer: `mx-auto w-full max-w-3xl space-y-8 py-8`.
+- Header: `space-y-1.5`; description gets `leading-relaxed`.
+- Between-section spacing: `space-y-8` at the list level.
+- Within-section spacing: `space-y-2.5` (label → container).
 
-- Sections + rows, or one unified list? Both are defensible;
-  decide first thing in the pass and the rest falls into place.
-- Section labels: keep, restyle, or drop? Tied to the above
-  decision.
-- Active badge: dot indicator, text badge, or both? Modern
-  dashboards often use a small coloured dot + label rather than
-  a pill.
+**Skeleton vocabulary:**
+
+- Section-label skeleton: `Skeleton h-4 w-28`.
+- Row-shaped skeleton inside the same `Card gap-0 p-0` container
+  the loaded row uses. Title-line `h-4 w-56`, meta-line
+  `h-3 w-40`, trailing `size-4 shrink-0`. No reflow on first
+  paint when data lands.
+
+**Deviations from the pre-pass scope:**
+
+- **Card primitive left untouched.** Pre-pass scope item 3
+  ("Replace shadcn's default `rounded-xl` + `ring-1` +
+  `shadow-xs` with thin `border` only") was framed as a
+  primitive-level refactor. Shipped instead as `gap-0 p-0`
+  overrides applied at each row use-site. Card keeps its default
+  `rounded-xl ring-1 shadow-xs` chrome everywhere across the app
+  — including the forms page row containers, which inherit the
+  ring + shadow from the unmodified primitive. The primitive-level
+  refactor was deferred to keep the visual change scoped to the
+  forms feature; it can land later as a standalone pass if the
+  design language extends to other surfaces.
+- **Section labels kept uppercase muted**, not switched to
+  sentence-case as the scope item proposed. Tightened only —
+  see "Resolved open questions" above.
+- **No CardAction slot for the trailing chevron/edit affordance.**
+  The chevron and the "Edit draft" inline element sit as direct
+  children of the row Link via flex, not as `<CardAction>`
+  slots — because the row Link IS the row content, not a Card
+  with header/footer slots. Card here is a borderless container,
+  not a full slotted card.
+
+**Verification:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder src/app/(home)/forms`
+runs clean.
+
+**Downstream implications (unchanged from pre-pass):**
+
+- Commits 8–11 inherit the row vocabulary, empty-state shape,
+  hover/focus treatment, Active-marker pattern, and Card-with-
+  overrides convention. The draft editor's `<QuestionCard>` will
+  use the same `Card gap-0 p-0` + row-Link pattern; the
+  prerequisite editor's predicate rows follow the same shape;
+  the historical viewer's read-only question list reuses the
+  row structure with edit affordances removed.
+- Commit 12 stays scoped to consistency cleanup against the
+  language set here, not redesign.
 
 ---
 

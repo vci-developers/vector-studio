@@ -1,35 +1,28 @@
-import {
-    Card,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import FormVersionsSection from './form-versions-section';
-import { Button } from '@/components/ui/button';
 import { PencilLine } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DraftVersionSection() {
     return (
         <FormVersionsSection label="Draft">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                            <CardTitle>Working draft</CardTitle>
-                            <CardDescription>
-                                Edit questions, follow-ups, and visibility
-                                rules. Changes save automatically as you go.
-                            </CardDescription>
+            <Card className="gap-0 p-0">
+                <Link
+                    href="/forms/draft"
+                    className="group hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-ring/60 flex items-center gap-4 px-4 py-3.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2"
+                >
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <div className="text-sm font-medium">Working draft</div>
+                        <div className="text-muted-foreground text-xs leading-relaxed">
+                            Edit questions, follow-ups, and visibility rules.
+                            Changes save automatically.
                         </div>
-                        <Button asChild>
-                            <Link href="/forms/draft">
-                                <PencilLine />
-                                Edit draft
-                            </Link>
-                        </Button>
                     </div>
-                </CardHeader>
+                    <div className="text-primary inline-flex shrink-0 items-center gap-1.5 text-sm font-medium group-hover:underline">
+                        <PencilLine className="size-3.5" />
+                        Edit draft
+                    </div>
+                </Link>
             </Card>
         </FormVersionsSection>
     );
