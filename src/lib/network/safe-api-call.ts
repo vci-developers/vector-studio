@@ -28,7 +28,9 @@ export async function safeApiCall<T>(
             ...options,
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'application/json',
+                ...(options?.body !== undefined && {
+                    'Content-Type': 'application/json',
+                }),
                 ...(options?.headers || {}),
             },
         });

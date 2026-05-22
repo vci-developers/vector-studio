@@ -21,7 +21,7 @@ and *which conventions we've committed to as we build*.
 | 6  | Builder utilities                       | ✅ done           |
 | 7  | Versions list page                      | ✅ done           |
 | 7.5| Design-language pass (interim)          | ✅ done           |
-| 8  | Draft editor (shell, rename, CRUD)      | pending           |
+| 8  | Draft editor (shell, rename, CRUD)      | ✅ done           |
 | 9  | Prerequisite editor                     | pending           |
 | 10 | Publish + checkout dialogs              | pending           |
 | 11 | Historical viewer                       | pending           |
@@ -328,6 +328,219 @@ runs clean.
   row structure with edit affordances removed.
 - Commit 12 stays scoped to consistency cleanup against the
   language set here, not redesign.
+
+---
+
+### Commit 8 — closed
+
+Draft editor page covering shell, inline rename, and full question
+CRUD (add, edit, delete, reorder, add follow-up). Visibility-rule
+UI is stubbed; commit 9 fills it in. Routes under
+`src/app/(home)/forms/draft/` plus a tree of feature components
+under `src/features/form-builder/components/draft-editor/` and one
+shared schema file under `validation/`.
+
+**File layout:**
+
+- [x] `src/app/(home)/forms/draft/page.tsx` — server entry.
+      Composes `<DraftEditorShell>` around
+      `<DraftEditorPageClient />`.
+- [x] `components/layout/draft-editor-shell.tsx` — server; back
+      link to `/forms`, h1 ("Edit draft"), and fixed page
+      description. Composed exactly once at the page level.
+- [x] `components/draft-editor-page-client.tsx` — `'use client'`;
+      perms gate. Reads `programId` from `useGetUserPermissions`.
+      Renders `<DraftEditorSkeleton>` (perms loading),
+      `<FormErrorBanner>` with Retry (perms failure),
+      `<UgandaProgramEmptyState>` (`programId === UGANDA_PROGRAM_ID`),
+      or `<DraftEditor programId>`.
+- [x] `components/draft-editor/draft-editor.tsx` — `'use client'`;
+      owns `useGetDraftFormByProgramId`, the four sheet/dialog
+      state pieces, and composes header + list + sheet + dialog.
+      Renders skeleton while the draft loads and
+      `<FormErrorBanner>` with Retry on failure.
+- [x] `components/draft-editor/draft-editor-header.tsx` — Card
+      with a neutral outline "Draft" badge + "Unpublished" meta,
+      then the form name as an inline-editable field.
+- [x] `components/draft-editor/form-name-inline-edit.tsx` —
+      `'use client'`; click-to-edit field calling
+      `usePutDraftFormByProgramId`. Enter / check button commits;
+      Escape / X button cancels. Toast on failure preserves the
+      user's input.
+- [x] `components/draft-editor/question-list.tsx` — sorts root
+      questions by `order`. Section header has an "Add question"
+      outline button when the list is non-empty; otherwise
+      renders `<EmptyDraftFormState>` with the same CTA.
+- [x] `components/draft-editor/question-card.tsx` — `'use client'`;
+      recursive renderer. Each row has ↑↓ icon buttons on the
+      left, a click-anywhere-to-edit ghost Button as the label /
+      meta column, and a `⋮` dropdown on the right with Edit /
+      Add follow-up / Delete. Nested rail (left border + indent)
+      renders only when the question has children.
+- [x] `components/draft-editor/question-sheet.tsx` — `'use client'`;
+      Radix `Sheet` controlled by a derived `isOpen` boolean.
+      Title switches between "Edit question", "Add follow-up
+      question", and "Add question" based on the primitives passed
+      in. Remounts `<QuestionForm>` via `key` when switching modes
+      so RHF defaults reset cleanly.
+- [x] `components/draft-editor/question-form.tsx` — `'use client'`;
+      RHF + `zodResolver` over the shared schema. Branches on
+      `questionBeingEdited` to dispatch
+      `usePostQuestionToDraftForm` or `usePutQuestionToDraftForm`.
+      Uses the shadcn form-id pattern (`<form id="question-form">`
+      + `<Button form="question-form">`) so the `SheetFooter`
+      submit button can sit outside the form. Visibility-rule
+      field is the commit 9 stub: shows `describePrerequisite` if
+      set, else "Always shown."
+- [x] `components/draft-editor/options-editor.tsx` — `'use client'`;
+      manages the `select` question type's dropdown options. Add /
+      edit / reorder (↑↓) / remove. Pure state controlled by the
+      parent Controller.
+- [x] `components/draft-editor/delete-question-dialog.tsx` —
+      `'use client'`; runs `findDependentQuestions` on open. If
+      the list is non-empty, becomes an explanation dialog listing
+      the dependents with no confirm button. Otherwise a confirm
+      with a destructive "Delete question" button. Mentions
+      sub-question cascade in the description copy when relevant.
+- [x] `components/loading/draft-editor-skeleton.tsx` — header
+      placeholder + section header + three row-shaped placeholders
+      inside a `Card gap-0 p-0` container matching the loaded
+      shape.
+- [x] `components/empty-state/empty-draft-form-state.tsx` — full
+      Card with `ListPlus` icon, copy explaining the next step,
+      and an inline "Add question" CTA.
+- [x] `validation/question-form-schema.ts` — shared Zod schema +
+      derived `QuestionFormInput` type. `.trim()` on label and
+      option strings; refine for `select` requiring at least one
+      option.
+
+**Component hierarchy:**
+
+```
+<DraftFormPage>                                       (server; shell + perms-gate)
+  └─ <DraftEditorShell>                               (server; back link + h1 + container)
+        └─ <DraftEditorPageClient>                    ('use client'; perms gate)
+              ├─ <DraftEditorSkeleton />                    (perms loading)
+              ├─ <FormErrorBanner onRetry … />              (perms failure)
+              ├─ <UgandaProgramEmptyState />                (programId === UGANDA_PROGRAM_ID)
+              └─ <DraftEditor programId>                    (owns draft query + sheet/dialog state)
+                    ├─ <DraftEditorHeader programId draft>
+                    │     └─ <FormNameInlineEdit programId draft>
+                    ├─ <QuestionList draft onAdd onEdit onDelete>
+                    │     └─ <QuestionCard … />              (recursive)
+                    ├─ <QuestionSheet … onClose>             (open derived from primitives)
+                    │     └─ <QuestionForm key=mode-id … />
+                    │           └─ <OptionsEditor />         (when type === 'select')
+                    └─ <DeleteQuestionDialog … onClose>
+```
+
+**Deviations from the plan:**
+
+- **`draft-editor-client.tsx` split into perms gate + loaded
+  editor**, mirroring the `forms-page-client` → `FormVersionsList`
+  pattern from commit 7. Perms-gate
+  (`draft-editor-page-client.tsx`) lives at the root of
+  `components/`; loaded editor (`draft-editor/draft-editor.tsx`)
+  sits in the subfolder and receives `programId` as a real prop.
+  Removes the dead `programId === null` defense and the `?? 0` +
+  `enabled` plumbing that a single-component shape would have
+  required.
+- **`question-drawer.tsx` → `question-sheet.tsx`**, matching the
+  shadcn primitive's actual name (`Sheet`, not `Drawer`).
+- **Question sheet / dialog state held as four primitive
+  `useState` pieces**, not a discriminated-union state object.
+  `questionBeingEdited: FormQuestion | null`,
+  `isAddQuestionSheetOpen: boolean`,
+  `parentIdForNewQuestion: number | null`,
+  `questionPendingDeletion: FormQuestion | null`. `FormQuestion`
+  is the only named shape passed across component boundaries —
+  same principle as commit 6's `EditorPrerequisite` removal.
+- **Shared form schema lives under `validation/`**, not inline in
+  the component. Matches
+  `features/auth/validation/login-form-schema.ts` and
+  `features/auth/validation/signup-form-schema.ts`. The schema is
+  reused by the `zodResolver` and by `z.infer` for the input type.
+- **Shadcn form-id pattern** (`<form id="question-form">` +
+  `<Button type="submit" form="question-form">`) instead of
+  nesting the submit button inside the form. The `SheetFooter` is
+  structurally separate from the form body, so the id reference
+  is cleaner than spanning the form across the footer.
+- **`useWatch({ control, name: 'type' })`** instead of
+  `questionForm.watch('type')`. The `watch()` returned from
+  `useForm()` is not memoizable, so React Compiler skips
+  optimising the whole component on sight. `useWatch` is a
+  separate hook the compiler handles correctly.
+- **Type change does not clear `options`** in form state. The
+  `OptionsEditor` unmounts when type ≠ select, and `onSubmit`
+  normalises `options` to `null` for non-select types. Users who
+  toggle select → text → select get their options back — minor UX
+  win and one less effect to keep in sync.
+- **Reorder uses `mutateAsync`** for the two sequential PUTs.
+  Plain `mutate` would require nesting the second call in the
+  first's `onSuccess`, which reads worse than two awaited results.
+  Two-toast scheme: "Couldn't reorder question" if the first PUT
+  fails (no second PUT fires); "Reorder finished partway" if the
+  second PUT fails (the hook's invalidate-on-success refetches the
+  draft so the UI self-heals).
+- **Subquestion rail renders only when `subQuestions.length > 0`.**
+  The first cut included a dead `|| depth >= 0` condition that
+  rendered an "Add follow-up" button under every leaf row,
+  duplicating the dropdown menu's "Add follow-up" item. Dropped
+  both the dead condition and the inline button — the dropdown is
+  the single affordance.
+- **`depth` prop removed from `QuestionCard`.** It influenced
+  nothing after the rail simplification above.
+- **Click-the-label-to-edit is a `<Button variant="ghost">`**, not
+  a native `<button>`. Several layout defaults are overridden
+  (`h-auto`, `flex-col`, `items-start`, `whitespace-normal`,
+  `font-normal`, softer `hover:bg-muted/40`) so the Button hosts
+  the two-line label + meta layout while keeping focus-visible
+  semantics from the primitive.
+- **Uganda gate replicated at `/forms/draft`.** A user could
+  bookmark the route directly; the gate matches the one in
+  `forms-page-client.tsx` so the experience is consistent. Same
+  TODO + `UGANDA_PROGRAM_ID` constant marker.
+- **`safeApiCall` hardened to only send
+  `Content-Type: application/json` when a body is present.**
+  Surfaced by the DELETE question call — upstream rejected
+  DELETE-with-Content-Type-and-no-body with "Body cannot be empty
+  when content-type is set to 'application/json'". The fix benefits
+  every body-less call across the codebase (GETs were sending the
+  header unnecessarily; upstream just happened to tolerate it).
+  Touches shared infrastructure outside the form-builder scope,
+  justified because the bug lives there.
+
+**Assumptions and requirements that held:**
+
+- **`noUncheckedIndexedAccess` is on**, confirmed by
+  `form-question-order.ts` already guarding
+  `[questionToMove, swapPartner]`. `question-card.tsx` guards
+  `[first, second] = swapPair` with the same
+  `if (!first || !second) return` pattern — satisfying the type,
+  not catching a real case (`swapAdjacentSiblings` always returns
+  a length-2 array or `null`).
+- **Sheet stays mounted; openness controlled by a derived
+  `isOpen` boolean.** Standard Radix pattern. Form remounts via
+  `key` so RHF defaults reset between modes (`add at root` →
+  `add follow-up under X` → `edit Y`).
+- **Hook-level invalidation handles partial-failure recovery.**
+  The reorder's "Reorder finished partway" toast relies on the
+  put-question hook invalidating the draft cache after each
+  successful PUT — the UI converges on whatever state the backend
+  reports.
+- **Form name inline edit does not sync to `draft.name` during an
+  active edit.** `pendingName` is seeded only on `startEditing()`,
+  so an external refetch mid-typing does not overwrite the user's
+  input.
+- **`PutQuestionToDraftFormRequestBody` is `.partial()`**, so
+  editing a question without touching the prerequisite simply
+  omits the field; the backend preserves the existing rule.
+  Required for the commit 9 stub to coexist with edits.
+
+**Verification:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder src/app/(home)/forms`
+runs clean.
 
 ---
 
