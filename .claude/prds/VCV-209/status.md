@@ -18,26 +18,192 @@ and *which conventions we've committed to as we build*.
 | 3  | Server functions                        | ✅ done           |
 | 4  | BFF routes                              | ✅ done           |
 | 5  | Query keys + TanStack hooks             | ✅ done           |
-| 6  | Builder utilities                       | 🔄 in progress    |
-| 7  | Versions list page                      | pending           |
+| 6  | Builder utilities                       | ✅ done           |
+| 7  | Versions list page                      | ✅ done           |
 | 8  | Draft editor (shell, rename, CRUD)      | pending           |
 | 9  | Prerequisite editor                     | pending           |
 | 10 | Publish + checkout dialogs              | pending           |
 | 11 | Historical viewer                       | pending           |
 | 12 | Polish pass                             | pending           |
 
-### Commit 6 — in flight
+### Commit 6 — closed
 
-Pure utility functions under `src/features/form-builder/utils/`:
+Three pure-function modules under `src/features/form-builder/utils/`:
 
-- [x] `flatten-form-questions.ts` — recursive tree walker
-- [x] `form-question-dependencies.ts` — `findDependents` for the delete blocker
-- [ ] `form-question-order.ts` — `nextOrderFor`, `swapAdjacentSiblings`
-- [ ] `form-question-prerequisite.ts` — `parsePrerequisite`, `serializePrerequisite`, `isPrerequisiteEditable`, `describePrerequisite`, `operatorsForQuestionType`, `OPERATOR_LABELS`
+- [x] `form-question-dependencies.ts` — `findDependentQuestions` for the
+      delete blocker.
+- [x] `form-question-order.ts` — `nextOrderFor`, `swapAdjacentSiblings`.
+- [x] `form-question-prerequisite.ts` — `OPERATOR_LABELS`,
+      `OPERATORS_BY_QUESTION_TYPE`, `isPrerequisiteEditable`,
+      `getPrerequisiteConnector`, `getPrerequisitePredicates`,
+      `buildPrerequisite`, `describePrerequisite`.
 
-When the four files are in place, run
-`npx tsc --noEmit && npx eslint src/features/form-builder` to confirm
-clean, then commit 6 closes.
+Deviations from the plan:
+
+- **No `flatten-form-questions.ts`.** Each consumer's tree walk does
+  something distinct (collect dependents, find max order, locate
+  siblings, look up a label) and a shared flattener would force a
+  middle representation no consumer keeps. Inline per "three similar
+  lines beats a premature abstraction."
+- **No `parsePrerequisite` / `serializePrerequisite`.** Replaced with
+  read helpers (`getPrerequisiteConnector`, `getPrerequisitePredicates`)
+  and a write helper (`buildPrerequisite`) over `PrerequisiteExpression`
+  directly. The editor's `EditorPrerequisite` intermediate type is gone.
+- **No `operatorsForQuestionType` wrapper.** Consumers read
+  `OPERATORS_BY_QUESTION_TYPE[question.type]` directly — one indirection
+  removed.
+- **No precomputed `questionsById` Map in
+  `describePrerequisite`.** A small recursive `findQuestionById` walks
+  on demand. Same asymptotic cost at the scale we operate at.
+
+### Commit 7 — closed
+
+Versions list page under `src/app/(home)/forms/` plus a tree of
+feature components under `src/features/form-builder/components/`
+organised by purpose. Only the client entry
+(`forms-page-client.tsx`) lives at the root of `components/`; every
+other component sits in a single-purpose subfolder.
+
+**File layout:**
+
+- [x] `src/app/(home)/forms/page.tsx` — server entry. Composes
+      `<FormsPageShell>` around `<FormsPageClient />` so the h1
+      paints SSR-first.
+- [x] `components/forms-page-client.tsx` — `'use client'`; perms
+      gate. Reads `programId` from `useGetUserPermissions`. Renders
+      `<FormVersionsListSkeleton>` (perms loading),
+      `<FormErrorBanner>` with Retry (perms failure),
+      `<UgandaProgramEmptyState>` (`programId === UGANDA_PROGRAM_ID`),
+      or `<FormVersionsList programId>`.
+- [x] `components/layout/forms-page-shell.tsx` — server; h1 + fixed
+      description + max-width container. Composed exactly once at the
+      page level, not per state variant.
+- [x] `components/loading/form-versions-list-skeleton.tsx` — three
+      shaped placeholder sections matching the eventual layout. Used
+      only for the perms-pending state; each section component owns
+      its own internal skeleton too.
+- [x] `components/error/form-error-banner.tsx` — reusable
+      destructive `role="alert"` banner with optional `title` and
+      `onRetry`. Used by the perms gate, the current-version section,
+      and the previous-versions section.
+- [x] `components/empty-state/uganda-program-empty-state.tsx` —
+      plain-language card explaining the builder is not yet enabled
+      for the legacy program.
+- [x] `components/empty-state/previous-versions-empty-state.tsx` —
+      dashed-border icon-led empty state for the "no previously
+      published versions yet" case.
+- [x] `components/form-versions-list/form-versions-list.tsx` — thin
+      composer of the three sibling sections. No fetching at this
+      level.
+- [x] `components/form-versions-list/form-versions-section.tsx` —
+      `<section>` + uppercase muted `<h2>` wrapper. Reused by every
+      section.
+- [x] `components/form-versions-list/current-version-section.tsx` —
+      `'use client'`; owns `useGetCurrentFormByProgramId`. Renders
+      skeleton, `<FormErrorBanner>` with Retry, or the active form
+      card with an emerald "Active" badge and a `date-fns` published
+      date.
+- [x] `components/form-versions-list/draft-version-section.tsx` —
+      static CTA card linking to `/forms/draft`. No fetch, no state.
+- [x] `components/form-versions-list/previous-versions-section.tsx` —
+      `'use client'`; owns `useGetFormsByProgramId`. Piggybacks on
+      the shared cache via `useGetCurrentFormByProgramId` to exclude
+      the active version from the list. Renders skeleton,
+      `<FormErrorBanner>` with Retry, `<PreviousVersionsEmptyState>`,
+      or a divided list of rows linking to `/forms/{version}`.
+
+**Component hierarchy:**
+
+```
+<FormsPage>                                          (server; renders shell + client)
+  └─ <FormsPageShell>                                (server; h1 + container)
+        └─ <FormsPageClient>                         ('use client'; perms gate)
+              ├─ <FormVersionsListSkeleton />              (perms loading)
+              ├─ <FormErrorBanner onRetry … />             (perms failure)
+              ├─ <UgandaProgramEmptyState />               (programId === UGANDA_PROGRAM_ID)
+              └─ <FormVersionsList programId>              (dynamic program)
+                    ├─ <CurrentVersionSection programId>   (owns /current)
+                    │     skeleton / banner / Card + Active badge
+                    ├─ <DraftVersionSection />             (static CTA)
+                    └─ <PreviousVersionsSection programId> (owns list; reads /current from cache)
+                          skeleton / banner / empty state / divided list
+```
+
+**Deviations from the plan:**
+
+- **Shell hoisted to the server page level**, not composed at every
+  leaf. H1 paints SSR-first, the client owns no chrome, and the
+  shell appears exactly once. A single fixed page description reads
+  truthfully across loading / error / Uganda / list states.
+- **Section-localized error UI**, not silent degradation. Fetch
+  failures surface as banners *in the section that failed*, each
+  with a Retry button — matching the AWS console / GitHub pattern.
+  Errors live where the failure is; degrading silently hides real
+  problems.
+- **Sibling section components own their own queries.** The original
+  plan inlined `<CurrentVersionCard>`, `<DraftVersionCard>`,
+  `<PublishedVersionRow>` inside a stateful `<FormVersionsList />`.
+  The final shape has three section components each handling their
+  own loading / error / empty / success branches; the parent is a
+  thin composer.
+- **`<FormErrorBanner>` replaces `<FormsPageError>`.** Reusable
+  banner with optional `title` and `onRetry`. Used in three places
+  (perms, current, previous).
+- **Best-effort current-version filter.** The previous-versions
+  section subscribes to the current-form query for filtering only.
+  When current is loading or errored, the filter is skipped and the
+  active version may briefly appear in the list — already surfaced
+  by the Active badge above. The current section's banner is the
+  source of truth for the retry. The duplication self-heals.
+- **No `format-published-date` util.** `date-fns` is already in the
+  project; `format(new Date(createdAt * 1000), 'MMM d, yyyy')` is
+  inlined at the two call sites. A four-line wrapper failed the
+  "three similar lines beats premature abstraction" test.
+- **Folder naming is singular**: `error/`, `empty-state/`,
+  `loading/`, `layout/`. One purpose per folder, named in the
+  singular.
+- **`PreviousVersionsSection`, not `PublishedVersionsSection`.** Only
+  one version is "published" at a time — the current. The list
+  shows versions that *used to be* published. The visible section
+  label stays "Previously published" for the non-technical
+  audience.
+- **"No current form" 404 mapped to an empty state in the component**,
+  not at the API boundary. The upstream returns 404 on
+  `/programs/{id}/forms/current` when no version has been set as
+  active — a domain state, not a network failure. The boundary-
+  translation option (server function maps `not_found` → `ok(null)`,
+  schema becomes `formSchema.nullable()`) was rejected in favour of
+  a single component branch: `if (!result.ok &&
+  result.error.kind === 'not_found') return <NoCurrentFormEmptyState>;`
+  Smaller diff, no contract change. The trade-off is a narrow
+  carve-out from "never use a fetch failure as a domain gate" — the
+  carve-out is principled because upstream's 404 is the *documented*
+  signal for "no current form," not a generic failure being
+  reinterpreted.
+- **`NoCurrentFormEmptyState`** added under
+  `components/empty-state/`. Dashed border + `FileText` icon,
+  matches `PreviousVersionsEmptyState` shape but distinct copy
+  pointing the user at the Draft section below.
+
+**Assumptions and requirements that held:**
+
+- **Legacy gate uses `programId === UGANDA_PROGRAM_ID` (= 1)**, not a
+  fetch error. The constant lives in `forms-page-client.tsx` with a
+  TODO; remove the gate once Uganda migrates.
+- **TanStack query `data.ok === false` is the only error signal.**
+  `fetchXxx` helpers never throw, so `query.error` / `query.isError`
+  never fire. Discriminate on `result.ok`.
+- **Banner, not toast, for load failures.** Persistent banners for
+  states the user must read and act on. Toasts are reserved for
+  transient post-action feedback (commit 8+).
+- **`UGANDA_PROGRAM_ID` is named, not magic.** Naming the specific
+  program is more honest about the temporary nature of the gate
+  than a generic `LEGACY_PROGRAM_ID`.
+
+**Verification:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder src/app/(home)/forms`
+runs clean.
 
 ---
 
@@ -144,43 +310,179 @@ explicitly overrides one.
 
 - Pure functions over contract types. No React, no hooks, no side
   effects.
-- **One intermediate type maximum per module**. Reuse contract types
-  everywhere else.
+- **Operate directly on contract types.** When a wire shape would
+  normally be unpacked into an "editor model" intermediate type, prefer
+  a pair of read helpers (`get…Connector`, `get…Predicates`) and a
+  write helper (`build…`) over a `parse`/`serialize` pair backed by a
+  named intermediate. The contract is the source of truth; UI
+  components hold the disassembled fields as separate React state
+  without naming a type for the composite.
 - Variable naming:
     - **`branch`** for children of prerequisite expression trees.
     - **`questionToMove`** / **`swapPartner`** for ordering operations.
-    - **`allQuestions`** instead of `flat` for flattened lists.
     - **`referencedQuestion`** for prerequisite targets.
+    - **`targetQuestionId`** when identifying a question by id at a
+      function boundary.
 - **Domain constants stay hard-coded.** Dynamism is for varying inputs;
   mapping an operator token to its English label has no input — that's
   a constant.
+- **No precomputed lookup caches** unless profiling justifies them. For
+  the 10–50 questions and 1–5 lookups per call typical here, a small
+  recursive finder beats a Map precomputation — asymptotic cost is the
+  same and the code is simpler.
 
 ### Components
 
-- **Server components by default.** `'use client'` only when
-  interactivity is required.
-- **Mutually recursive components** for question tree rendering. Don't
-  flatten for display — the wire shape is a tree; components walk it.
+- **One component per file.** No same-file sub-components. Each
+  component is its own file with `export default`. Local helper
+  *functions* (e.g. a date formatter) are fine; local component
+  definitions are not.
+- **Only the page-level entry lives at the root of `components/`.**
+  Everything else lives in a purpose-named subfolder. Categories used
+  so far:
+    - `layout/` — page shells, headers, structural wrappers.
+    - `loading/` — skeletons.
+    - `errors/` — error banners.
+    - `empty-states/` — full-state empty/blocked UI.
+    - `<feature-list>/` — feature-specific composites (e.g.
+      `form-versions-list/`, future `draft-editor/`,
+      `historical-viewer/`).
+- **Combine where granularity exceeds reuse value.** A single-use
+  card or row rendered inside one parent stays inline in the parent
+  (as JSX, not as a same-file sub-component). Extract to its own file
+  only when the piece is reused, when the prop surface is complex
+  enough to warrant a typed interface, or when it's used inside a
+  `.map()` and inlining hurts scan-ability.
+- **Server components by default.** `'use client'` only when the
+  component owns local state, an effect, or a TanStack hook. Leaf
+  presentational components inherit client treatment from their
+  importing parent — don't add `'use client'` defensively.
+- **Mutually recursive components** for question tree rendering.
+  Don't flatten for display — the wire shape is a tree; components
+  walk it.
 - Indentation + left border on nested children creates visual
   hierarchy. Same card shape at every depth — the hierarchy lives in
   the layout, not the card chrome.
 - Sort `subQuestions` by `order` at the rendering site (defensive).
-- shadcn primitives composed; feature-specific components live under
-  `src/features/<feature>/components/`.
+- shadcn primitives composed directly; never wrap them in pass-through
+  components.
+
+#### Page composition
+
+- **Page shell at the server route entry.** A page-level component
+  (e.g. `FormsPageShell`) owns the h1, the outer max-width container,
+  and a fixed page description. It wraps the client entry in the
+  server `page.tsx` so the h1 paints before hydration. The shell is
+  composed exactly once per route, not at every state variant.
+- **State variants are pure bodies.** Skeletons, error banners,
+  empty states, and the active list render only body content — no
+  h1, no outer container. The shell sits above them.
+- **Page-level description is fixed**, not state-dependent. Pick a
+  description that reads truthfully across loading / error / empty /
+  success. State-specific copy lives in the variant itself (e.g. an
+  empty state's title + description).
+- **Section-localized error UI.** Each section that fetches data
+  owns its own loading / error / success state machine and surfaces
+  failures via `<FormErrorBanner>` inside the section. Errors live
+  where the failure is — matching the AWS console / GitHub pattern.
+  Never degrade silently for a fetch failure; the user needs the
+  signal to retry.
+- **Sibling fetching sections.** When a parent composes multiple
+  data-fetching subsections, prefer sibling section components that
+  each own their own queries over a stateful parent passing results
+  down. Dual subscriptions to the same query key are cheap — TanStack
+  dedupes the request and shares cache state, so a single retry
+  reconciles every subscribed component.
+- **Best-effort cross-section filters.** When a section's *secondary*
+  data (used to filter or annotate, not as primary display) is
+  loading or errored, skip the filter / annotation rather than
+  bubbling another error. The section showing the primary failure is
+  the source of truth for the user's retry action; double-reporting
+  the same underlying error is noise.
+- **Result envelope is the only error contract.** TanStack query
+  `data.ok === false` means a `NetworkError`. `fetchXxx` helpers
+  never throw, so `query.error` / `query.isError` never fire — always
+  discriminate on `result.ok`.
+- **Never use a fetch failure as a domain gate.** Conflating
+  "current form fetch errored" with "this is a legacy program" blocks
+  legitimate flows (a brand-new dynamic program would never get to
+  publish its first version). Domain gates use explicit domain
+  inputs — for the legacy/dynamic split that means
+  `programId === UGANDA_PROGRAM_ID` until migration completes.
+- **Banner over toast for load failures.** A page-level or
+  section-level load failure is a state the user must read and act
+  on; a banner persists and offers Retry. Toasts are reserved for
+  transient post-action feedback.
+
+### UI design
+
+The bar is the polish of mature dev-tool products — GitHub, Linear,
+Stripe. The builder is an admin tool used by non-engineers, so it has
+to feel sturdy, learnable in one sitting, and never punish a mistake.
+
+- **Typography is the primary hierarchy device.** Page heading, section
+  heading, body, and metadata each have distinct size and weight — not
+  just "bigger text." Headings carry meaning; secondary metadata
+  (timestamps, version strings, ids) stays muted.
+- **Spacing on the 8px grid.** Use Tailwind's spacing scale
+  (`gap-2`, `gap-4`, `p-6`, `space-y-6`). Avoid one-off pixel values
+  and ad-hoc margins.
+- **Group with restraint.** Subtle borders (`border border-border`) and
+  muted backgrounds (`bg-muted/50`) beat heavy cards or shadows.
+  Hierarchy lives in spacing, not chrome. The same card shape works at
+  every depth — nesting expresses itself through indentation, not
+  visual weight.
+- **Quiet palette, loud accents.** Neutral surfaces by default;
+  semantic color (success / warning / destructive) reserved for status
+  badges and confirmations. At most one bright primary action per view.
+- **Skeletons match the layout.** Loading states are placeholders for
+  the eventual shape, not generic spinners. The page should never blink
+  blank or reflow on first paint.
+- **Empty states explain the next step.** A blank list says nothing;
+  "No published versions yet — publish your draft to see it here" tells
+  the admin what to do. The legacy-program empty state owes the same
+  honesty.
+- **Destructive actions are quiet, deliberate, and reversible-feeling.**
+  Use the destructive button variant, confirm in a dialog, surface the
+  consequence in plain language ("This will permanently delete the
+  question. 3 other questions depend on it and will break."). Never
+  hide the destructive action behind an icon-only button.
+- **Focus states must stay visible.** shadcn primitives ship with
+  reasonable focus rings — do not override them away. The builder
+  needs to be keyboard-navigable end to end.
+- **Inline editing for single-field changes** (the form name in the
+  draft editor header). **Drawers for multi-field flows** (add /
+  edit question, prerequisite editor) — they keep the question list
+  visible underneath. Modals only for confirmations and publish.
+- **Live previews where the user is composing structure.** The
+  prerequisite editor's natural-language sentence updates as the user
+  edits; it is the contract between the user's intent and the rule
+  that will run.
+
+#### Prop surfaces
+
+- **Pass the fields a component renders, not the whole entity.** A
+  `<QuestionCard>` takes a `FormQuestion` and the actions it can
+  fire, not the whole `Form`. A `<PublishedFormVersionRow>` takes a
+  single `Form`, not the array.
+- **Domain objects in, primitive callbacks out.** Children invoke
+  callbacks rather than receiving mutation hooks or query results
+  directly. Keeps presentational components free of TanStack
+  dependencies.
 
 ### Naming
 
 | Type                 | Example                                                |
 | -------------------- | ------------------------------------------------------ |
-| React component      | `QuestionTree`, `VersionsList`, `PublishDialog`        |
-| Page component       | `FormsPage`, `DraftEditorPage`                         |
+| React component      | `FormVersionsList`, `FormVersionsSection`, `CurrentVersionSection`, `DraftVersionSection`, `PreviousVersionsSection`, `FormsPageShell`, `FormErrorBanner`, `UgandaProgramEmptyState`, `PreviousVersionsEmptyState`, `NoCurrentFormEmptyState`, `FormVersionsListSkeleton` |
+| Page component       | `FormsPage` (server shell), `FormsPageClient` (client entry) |
 | Server function      | `getCurrentFormByProgramId`, `publishDraftFormForProgram` |
 | BFF route handler    | `GET`, `POST` inside `route.ts`                        |
 | TanStack Query hook  | `useGetDraftFormByProgramId`, `usePostQuestionToDraftForm` |
 | Query keys           | `formKeys`, `formKeys.draftByProgramId(programId)`     |
 | Zod schema           | `formQuestionSchema`, `publishDraftFormForProgramRequestSchema` |
 | Type from schema     | `FormQuestion`, `PublishDraftFormForProgramRequestBody` |
-| Utility function     | `findDependents`, `swapAdjacentSiblings`, `describePrerequisite` |
+| Utility function     | `findDependentQuestions`, `swapAdjacentSiblings`, `describePrerequisite`, `buildPrerequisite` |
 | Feature folder       | `form-builder`                                         |
 
 ### Code standards
@@ -206,9 +508,68 @@ Discussed but pushed out of the current feature scope:
 - **Optimistic updates.** Not in v1; invalidate-and-refetch instead.
 - **Mutation hook `options` parameter.** Removed for v1; can be added
   back non-breaking when a real need emerges.
-- **Composing `OPERATORS_BY_TYPE`** from named operator groups. Flat
-  table at 5 types × 12 operators is more scannable; revisit if scale
-  grows.
+- **Composing `OPERATORS_BY_QUESTION_TYPE`** from named operator
+  groups. Flat table at 5 types × 12 operators is more scannable;
+  revisit if scale grows.
+- **`EditorPrerequisite` intermediate type.** Dropped in commit 6 in
+  favour of read/write helpers (`getPrerequisiteConnector`,
+  `getPrerequisitePredicates`, `buildPrerequisite`) over
+  `PrerequisiteExpression` directly. Editor components hold
+  `connector` and `predicates` as separate React state — the contract
+  remains the only named shape.
+- **Shared `flatten-form-questions` helper.** Considered for commit 6
+  as a single tree walker used by all utility modules. Dropped because
+  each consumer walks for a different reason and the recursion is
+  short enough to inline per module.
+- **Legacy detection via `/current` fetch error** (per the original
+  PRD). Discarded in commit 7 because it conflates a network failure
+  with a domain state and would block a newly-migrated dynamic
+  program from publishing its first version. Replaced with an
+  explicit `programId === UGANDA_PROGRAM_ID` gate. Remove the
+  constant when Uganda migrates.
+- **Generic `LEGACY_PROGRAM_ID` name.** Rejected in favour of the
+  specific `UGANDA_PROGRAM_ID` so the gate reads as the temporary
+  hack it is, not as a permanent abstraction.
+- **Silent degradation of section fetch failures.** Originally
+  rejected per-section error UI; reversed in commit 7. Section-
+  localized banners with Retry are now the convention (see Page
+  composition). Errors live where the failure is; silent fallback
+  hid real problems and gave the user no way to recover.
+- **Leaf-composed page shell.** Originally `<FormsPageShell>` wrapped
+  every state variant inside the client; reversed in commit 7. The
+  shell now lives in the server `page.tsx` so the h1 paints SSR-
+  first. The "description varies by state" argument did not hold —
+  a single fixed description reads truthfully across all states, and
+  state-specific copy lives in the variant body.
+- **Stateful `<FormVersionsList />` fetching both queries.** The
+  plan had the list component fetch current + list and inline three
+  cards/rows. Reversed in commit 7 — the parent is a thin composer
+  and three sibling section components each own their own queries
+  and state machines. Dual subscriptions to `/current` are
+  intentional (TanStack dedupes the request) and let the previous-
+  versions section piggyback on the shared cache for filtering.
+- **`format-published-date` util.** Considered for commit 7 to share
+  the unix-seconds → display formatter. Dropped because `date-fns`
+  is already in the project and a four-line wrapper failed the
+  "three similar lines beats premature abstraction" test. `format(…)`
+  inlined at the two call sites.
+- **Codebase-wide `fetchXxx` hardening.** The convention says
+  `fetchXxx` helpers never throw, so `query.error` / `query.isError`
+  never fire — discriminate only on `result.ok`. In practice every
+  current `fetchXxx` lets `fetch` and `response.json()` throw,
+  putting TanStack in error state with `data: undefined` when those
+  fail (back/forward nav abort, network drop, non-JSON response).
+  The bug surfaces as a perpetually-loading page after browser
+  back-then-forward, because the component check
+  `!data || isPending` matches the error state too. Fix is to wrap
+  each `fetchXxx` body in try/catch and return
+  `{ ok: false, error: { kind: 'network' } }` on throw, then
+  simplify the section/page checks to use `isPending` only. Deferred
+  to a single dedicated commit so the cleanup is codebase-wide
+  rather than piecemeal; commit 7 components keep the
+  `!data || isPending` check until then. A specific Next.js App
+  Router + TanStack interaction is the second-most-likely culprit
+  for the back-button bug if the `fetchXxx` fix doesn't resolve it.
 
 ---
 
