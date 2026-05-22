@@ -13,6 +13,7 @@ import {
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import NoCurrentFormEmptyState from '../empty-state/no-current-form-empty-state';
+import Link from 'next/link';
 
 interface CurrentVersionSectionProps {
     programId: number;
@@ -68,25 +69,30 @@ export default function CurrentVersionSection({
 
     return (
         <FormVersionsSection label="Current version">
-            <Card>
-                <CardHeader>
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1">
-                            <CardTitle>{currentForm.name}</CardTitle>
-                            <CardDescription>
-                                Version {currentForm.version} · Published{' '}
-                                {format(
-                                    new Date(currentForm.createdAt * 1000),
-                                    'MMM d, yyyy',
-                                )}
-                            </CardDescription>
+            <Link
+                href={`/forms/${currentForm.version}`}
+                className="group block"
+            >
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                                <CardTitle>{currentForm.name}</CardTitle>
+                                <CardDescription>
+                                    Version {currentForm.version} · Published{' '}
+                                    {format(
+                                        new Date(currentForm.createdAt * 1000),
+                                        'MMM d, yyyy',
+                                    )}
+                                </CardDescription>
+                            </div>
+                            <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                                Active
+                            </Badge>
                         </div>
-                        <Badge className="border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-                            Active
-                        </Badge>
-                    </div>
-                </CardHeader>
-            </Card>
+                    </CardHeader>
+                </Card>
+            </Link>
         </FormVersionsSection>
     );
 }

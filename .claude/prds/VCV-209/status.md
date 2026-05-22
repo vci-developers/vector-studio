@@ -20,11 +20,12 @@ and *which conventions we've committed to as we build*.
 | 5  | Query keys + TanStack hooks             | ✅ done           |
 | 6  | Builder utilities                       | ✅ done           |
 | 7  | Versions list page                      | ✅ done           |
+| 7.5| Design-language pass (interim)          | pending           |
 | 8  | Draft editor (shell, rename, CRUD)      | pending           |
 | 9  | Prerequisite editor                     | pending           |
 | 10 | Publish + checkout dialogs              | pending           |
 | 11 | Historical viewer                       | pending           |
-| 12 | Polish pass                             | pending           |
+| 12 | Polish + consistency cleanup            | pending           |
 
 ### Commit 6 — closed
 
@@ -184,6 +185,13 @@ other component sits in a single-purpose subfolder.
   `components/empty-state/`. Dashed border + `FileText` icon,
   matches `PreviousVersionsEmptyState` shape but distinct copy
   pointing the user at the Draft section below.
+- **Current-version card is clickable.** Wrapped in a
+  `<Link href={`/forms/${currentForm.version}`}>` so clicking routes
+  to the historical viewer (commit 11) at the current form's version
+  — the same destination as a previously-published row. The current
+  form is "just another published version" from a routing
+  perspective; the UI affordance is unified. Hover/focus treatment
+  is intentionally minimal pending the design-language pass below.
 
 **Assumptions and requirements that held:**
 
@@ -204,6 +212,93 @@ other component sits in a single-purpose subfolder.
 
 `npx tsc --noEmit && npx eslint src/features/form-builder src/app/(home)/forms`
 runs clean.
+
+---
+
+### Commit 7.5 — design-language pass (pending)
+
+Interim polish pass between commit 7 and commit 8. The functional
+versions list is in, but the visual language is generic
+shadcn-template aesthetic — rounded-xl cards with rings, uppercase
+muted section labels, dashed-border empty states, no hover
+treatment on the current-version card. Goal of this pass is to set
+the design language *once* so commits 8–11 inherit it and commit
+12 becomes consistency cleanup rather than redesign.
+
+**Reference quality bar:** GitHub, Linear, Vercel dashboards.
+Sturdy, learnable in one sitting, never punishes a mistake. Quiet
+palette, loud accents. Typography is the primary hierarchy device;
+chrome is restrained.
+
+**Scope of the pass:**
+
+1. **Unify section visual language.** Today current/draft cards
+   use `rounded-xl` card chrome with a ring, and the
+   previously-published list uses divided rows in a bordered
+   container — two visual languages on the same page. Collapse to
+   one: either every version is a row in a single list (current
+   marked Active, draft as a row with a primary CTA), or keep
+   sections but apply the same row treatment within each.
+2. **Section labels.** Drop uppercase muted h2 in favour of
+   sentence-case semibold at a slightly larger weight — or omit
+   labels entirely if the rows are self-descriptive (current's
+   Active badge, draft's CTA).
+3. **Card chrome density.** Replace shadcn's default
+   `rounded-xl` + `ring-1` + `shadow-xs` with thin `border` only,
+   no ring, no shadow. Grouping comes from spacing and subtle
+   background contrast (`bg-muted/30` or similar), not chrome.
+4. **Badge refinement.** Tighten the Active badge — size, tracking,
+   palette alignment with the rest of the design system. Today's
+   custom emerald is fine but slightly off-palette.
+5. **Hover and focus.** Every navigable row/card gets a
+   `hover:bg-muted/50` (or similar) + `focus-visible` treatment.
+   Optionally a leading-edge accent. End-to-end keyboard navigation
+   should feel as good as mouse.
+6. **Skeletons match content shape.** Replace generic
+   `h-24 w-full` rectangles with placeholders that mirror the
+   eventual row (title bar + caption + badge slot). No reflow on
+   first paint.
+7. **Empty-state visual language.** Move away from dashed borders.
+   Lean on neutral surfaces + icon + tight spacing, in line with
+   the rest of the design.
+8. **Typography rhythm.** Tighten heading leading/tracking;
+   normalise description color stop; standardise body vs metadata
+   sizes across components. One table of typographic intents,
+   applied consistently.
+9. **Iconography.** Normalise icon sizes against text baselines.
+   `size-3.5` / `size-4` / `size-5` used intentionally, not
+   incidentally.
+
+**Out of scope for the design-language pass:**
+
+- New feature work or behavioural changes. This is a visual pass
+  only.
+- Reworking the underlying component decomposition. The
+  three-sibling-sections shape stays; only its visual treatment
+  changes.
+- Animation work beyond simple `transition-colors` for hover.
+- Dark-mode-specific design beyond what the existing tokens
+  cover.
+
+**How this changes the downstream commits:**
+
+- Commits 8–11 build on the established design language.
+  `<QuestionCard>`, `<QuestionDrawer>`, `<PrerequisiteEditor>`,
+  the publish/checkout dialogs, and the historical viewer all
+  inherit the spec set here.
+- Commit 12 becomes "consistency cleanup" — audit every surface
+  against the language, fix drift, finalise a11y. No design
+  invention at commit 12.
+
+**Open questions for the pass:**
+
+- Sections + rows, or one unified list? Both are defensible;
+  decide first thing in the pass and the rest falls into place.
+- Section labels: keep, restyle, or drop? Tied to the above
+  decision.
+- Active badge: dot indicator, text badge, or both? Modern
+  dashboards often use a small coloured dot + label rather than
+  a pill.
 
 ---
 
