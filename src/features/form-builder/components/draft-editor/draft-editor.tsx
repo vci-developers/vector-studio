@@ -9,6 +9,7 @@ import DeleteQuestionDialog from './delete-question-dialog';
 import QuestionSheet from './question-sheet';
 import DraftEditorHeader from './draft-editor-header';
 import QuestionList from './question-list';
+import PublishDialog from './publish-dialog';
 
 interface DraftEditorProps {
     programId: number;
@@ -29,6 +30,7 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
     >(null);
     const [questionPendingDeletion, setQuestionPendingDeletion] =
         useState<FormQuestion | null>(null);
+    const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
 
     if (!getDraftFormByProgramIdResult || isGetDraftFormByProgramIdPending) {
         return <DraftEditorSkeleton />;
@@ -50,7 +52,11 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
 
     return (
         <div className="space-y-8">
-            <DraftEditorHeader programId={programId} draft={draft} />
+            <DraftEditorHeader
+                programId={programId}
+                draft={draft}
+                onOpenPublishDialog={() => setIsPublishDialogOpen(true)}
+            />
             <QuestionList
                 draft={draft}
                 onAddQuestion={parentId => {
@@ -76,6 +82,11 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
                 programId={programId}
                 draft={draft}
                 onClose={() => setQuestionPendingDeletion(null)}
+            />
+            <PublishDialog
+                isOpen={isPublishDialogOpen}
+                programId={programId}
+                onClose={() => setIsPublishDialogOpen(false)}
             />
         </div>
     );

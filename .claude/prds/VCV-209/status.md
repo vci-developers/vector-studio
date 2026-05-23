@@ -23,8 +23,8 @@ and *which conventions we've committed to as we build*.
 | 7.5| Design-language pass (interim)          | ✅ done           |
 | 8  | Draft editor (shell, rename, CRUD)      | ✅ done           |
 | 9  | Prerequisite editor                     | ✅ done           |
-| 10 | Publish + checkout dialogs              | pending           |
-| 11 | Historical viewer                       | pending           |
+| 10 | Publish + checkout dialogs              | ✅ done           |
+| 11 | Historical viewer (diff-based)          | pending           |
 | 12 | Polish + consistency cleanup            | pending           |
 
 ### Commit 6 — closed
@@ -719,6 +719,265 @@ runs clean.
 
 ---
 
+### Commit 10 — closed
+
+Publish and checkout confirmation dialogs. Publish is wired into the
+draft editor header; the checkout dialog is created but not yet wired
+(its historical-viewer consumer arrives in commit 11).
+
+**File layout:**
+
+- [x] `components/draft-editor/publish-dialog.tsx` — `'use client'`;
+      shadcn `Dialog` controlled by `isOpen`. Subscribes to
+      `useGetFormsByProgramId` for two purposes: surfacing the latest
+      published version as a `<FieldDescription>` reference, and
+      blocking duplicate version names via a `Set` lookup. Validates
+      non-empty + not-already-used; Enter submits; on success closes
+      the dialog, navigates to `/forms`, and surfaces a success toast.
+- [x] `components/draft-editor/checkout-confirm-dialog.tsx` —
+      `'use client'`; shadcn `Dialog` controlled by
+      `formToCheckout: Form | null` (same `null === closed` pattern as
+      `questionPendingDeletion`). Plain-language warning about draft
+      replacement, destructive confirm, navigates to `/forms/draft` on
+      success.
+- [x] `components/draft-editor/draft-editor-header.tsx` — accepts
+      `onOpenPublishDialog`, adds a default-size "Publish" button on
+      the meta row opposite the Draft/Unpublished badge.
+- [x] `components/draft-editor/draft-editor.tsx` — adds
+      `isPublishDialogOpen` state, wires the open callback into the
+      header, renders `<PublishDialog>` alongside the existing sheet
+      and dialogs.
+
+**Component hierarchy:**
+
+```
+<DraftEditor>                            (owns draft query + dialog state)
+  ├─ <DraftEditorHeader onOpenPublishDialog>
+  │     ├─ Draft / Unpublished meta row
+  │     ├─ Publish button (default size, right side)
+  │     └─ <FormNameInlineEdit />
+  ├─ <QuestionList … />
+  ├─ <QuestionSheet … />
+  ├─ <DeleteQuestionDialog … />
+  └─ <PublishDialog isOpen programId onClose>
+```
+
+**Deviations from the plan:**
+
+- **`checkout-confirm-dialog.tsx` parked under `draft-editor/`**, not
+  `historical-viewer/` as the original plan called out. The
+  historical-viewer folder doesn't exist yet; the file sits with the
+  other draft-editor dialogs. Commit 11 either imports across the
+  folder boundary or moves the file at that point.
+- **No new query or mutation hooks.** `usePublishDraftFormForProgram`
+  (commit 5) invalidates `formKeys.formsByProgramId(programId)` =
+  `['forms', programId]`, the per-program prefix. TanStack treats it
+  as a prefix match, so a single invalidation covers current / draft
+  / list / per-version in one shot. No contracts or hooks touched.
+- **No new util for "find latest published" or "collect used
+  versions."** Both are ~3-line inline snippets at the only call
+  site. The filter-draft + sort-by-createdAt pattern duplicates
+  `previous-versions-section.tsx`'s body, but inlining still beats a
+  util used twice across two files of trivial logic.
+- **Pending version state is not reset on dialog close.** A first
+  cut used a `useEffect` to clear `pendingVersion` when `isOpen`
+  flipped to false. ESLint's `react-hooks/set-state-in-effect`
+  flagged it; dropping the effect entirely was the better fix —
+  letting the typed version persist between cancel/reopen avoids
+  re-typing on a transient close, and the component unmounts (state
+  goes away) on successful publish via `router.push('/forms')`.
+- **Best-effort dup-check validation.** When
+  `useGetFormsByProgramId` is still pending or errored,
+  `publishedForms` stays `null` and the "already used" filter
+  short-circuits — the user can submit, and the backend's 409 (if
+  the version actually was a duplicate) surfaces as a toast. Same
+  best-effort principle as the previous-versions-section's
+  current-form filter.
+
+**Assumptions and requirements that held:**
+
+- **Dialog state owned by `draft-editor.tsx`**, same pattern as
+  `QuestionSheet` and `DeleteQuestionDialog`. The header receives an
+  `onOpenPublishDialog` callback rather than owning dialog state.
+- **Publish hook invalidates by prefix.** Documented in commit 5's
+  conventions and confirmed in practice this commit — invalidating
+  `['forms', programId]` catches all per-program forms queries.
+- **Confirm button on checkout uses the destructive variant.** Per
+  the design-language convention — replacing the draft discards
+  in-progress work and is irreversible.
+- **Result envelope is the only error contract.** Both dialogs
+  discriminate on `result.ok` inside `onSuccess` with a fallback
+  `onError` for the thrown-error path. No try/catch in the UI layer.
+
+**Verification:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder`
+runs clean.
+
+---
+
+### Commit 11 — planned (Historical viewer, diff-based)
+
+Renamed and rescoped from "Historical viewer" — the diff view that
+the PRD's Out of Scope explicitly deferred is now in scope. Replaces
+the planned read-only question list with a GitHub-style diff showing
+how the viewed historical version differs from the user's current
+draft. The checkout-confirm-dialog from commit 10 wires into this
+viewer.
+
+**Design decisions resolved up front:**
+
+- **Direction of diff.** Viewed historical version is the TO state,
+  current draft is the FROM state. Added (green `+`) = in viewed but
+  not draft. Removed (red `−`) = in draft but not viewed. Modified
+  (yellow `±`) = in both with field differences. Answers "what would
+  change if I check this version out."
+- **Granularity.** Question shells diff at the question level
+  (added / removed / modified / unchanged). Modified questions
+  expand to per-field changes (label, type, required, options,
+  prerequisite, parent). Reorders within the same parent are not
+  detected — see Deferred decisions.
+- **Layout.** Single page replaces the read-only list. No tab or
+  toggle. The diff IS the historical viewer.
+- **Unchanged questions** render in a muted style with no diff
+  marker, so the diff has tree context. No collapse / "Hide
+  unchanged" toggle in v1.
+- **Walk order.** Render the merged tree in the viewed version's
+  order; removed-from-draft questions are appended at the end of
+  each parent's children list. Simple, predictable, matches
+  GitHub's "removed lines stay near where they used to be" pattern.
+- **Checkout flow.** The historical viewer page is the diff surface;
+  "Check out" opens the existing small confirm dialog from commit
+  10. The dialog is not enhanced with an embedded diff — the diff
+  is already visible on the page behind it. Future option of a
+  diff-embedded checkout sheet captured under Deferred decisions.
+
+**File layout:**
+
+- `app/(home)/forms/[version]/page.tsx` — server entry. Composes
+  the historical-viewer shell around
+  `<HistoricalViewerPageClient version={...} />`. The `"draft"`
+  segment is handled by the sibling `draft/page.tsx` already, so
+  this route never sees it.
+- `features/form-builder/utils/form-version-diff.ts` — pure
+  function `diffFormVersions(draft, viewedVersion)` returns a
+  `FormVersionDiff`. Walks both trees, matches questions by id,
+  classifies each as added / removed / modified / unchanged, and
+  computes field-level changes for modified questions. This is the
+  one place where a named computed type is justified — a diff is
+  genuinely new information, not a reorganisation of contract
+  fields (see Implementation rules carve-out below).
+- `features/form-builder/components/historical-viewer/` — new
+  folder, parallel to `form-versions-list/` and `draft-editor/`.
+  - `historical-viewer-page-client.tsx` — `'use client'`; perms
+    gate identical to the draft editor's. Reads `programId` from
+    `useGetUserPermissions`. Renders skeleton, `<FormErrorBanner>`,
+    `<UgandaProgramEmptyState>`, or `<HistoricalViewer>`.
+  - `historical-viewer/historical-viewer.tsx` — `'use client'`;
+    owns `useGetProgramFormByVersion(programId, version)` and
+    `useGetDraftFormByProgramId(programId)`. Renders a viewer
+    skeleton while either query is pending. On success, computes
+    `diffFormVersions(draft, viewedVersion)` and composes header +
+    summary + diff list + checkout dialog.
+  - `historical-viewer/historical-viewer-header.tsx` — version
+    badge, published date, and "Check out" button on the right
+    that sets `formToCheckout` on the parent.
+  - `historical-viewer/diff-summary.tsx` — top-of-page summary
+    pill row: `+X added · −Y removed · ±Z modified`.
+  - `historical-viewer/diff-question-list.tsx` — renders the
+    recursive question diff tree.
+  - `historical-viewer/diff-question-card.tsx` — recursive
+    renderer for a single question diff. Card shell coloured by
+    status (added=green, removed=red, modified=yellow,
+    unchanged=neutral muted). Header shows the diff marker
+    (`+` / `−` / `±` / blank) and the label with type/required
+    badges. Modified questions expand to show field changes.
+  - `historical-viewer/diff-field-change-row.tsx` — single row for
+    a modified field. `label · old → new` for scalars,
+    `label · +added · −removed` for option lists, natural-language
+    sentence before/after for prerequisites (using
+    `describePrerequisite`).
+  - `loading/historical-viewer-skeleton.tsx` — placeholder shape
+    matching the eventual diff layout.
+- Commit 10's `checkout-confirm-dialog.tsx` either moves to
+  `historical-viewer/` or is imported across the folder boundary.
+  Decision deferred to commit-11 execution.
+
+**The diff util — shape:**
+
+```ts
+type QuestionDiffKind = 'unchanged' | 'added' | 'removed' | 'modified';
+
+type ScalarFieldChange<T> = { from: T; to: T };
+
+type OptionsFieldChange = { added: string[]; removed: string[] };
+
+type ParentFieldChange = {
+    from: { id: number; label: string } | null; // null = root
+    to: { id: number; label: string } | null;
+};
+
+type QuestionFieldChanges = {
+    label?: ScalarFieldChange<string>;
+    type?: ScalarFieldChange<FormQuestionType>;
+    required?: ScalarFieldChange<boolean>;
+    options?: OptionsFieldChange;
+    prerequisite?: ScalarFieldChange<PrerequisiteExpression | null>;
+    parent?: ParentFieldChange;
+};
+
+type QuestionDiff = {
+    kind: QuestionDiffKind;
+    // For added/modified/unchanged: the FormQuestion from the
+    // viewed version. For removed: the FormQuestion from the draft.
+    question: FormQuestion;
+    fieldChanges: QuestionFieldChanges; // empty unless kind === 'modified'
+    children: QuestionDiff[];
+};
+
+type FormVersionDiff = {
+    questionDiffs: QuestionDiff[];
+    summary: {
+        added: number;
+        removed: number;
+        modified: number;
+        unchanged: number;
+    };
+};
+```
+
+These are the only two new named types the codebase gains
+(`QuestionDiff`, `FormVersionDiff`, plus the supporting field-change
+types). They describe a computed view, not a reorganisation of
+contract fields — which is the carve-out the Implementation rules
+allow: "no intermediate types outside the main domain models"
+prohibits aliasing or unpacking contract shapes, not naming
+genuinely new information.
+
+**Open subdecisions to resolve during execution:**
+
+- **Whether to expand modified questions by default or via toggle.**
+  v1 sketch: expand by default for clarity, since modified questions
+  carry the densest information. Revisit if forms with many modified
+  questions feel overwhelming.
+- **Visual treatment of unchanged questions.** Either muted full row
+  (current sketch) or collapsed to a one-line summary. v1 sketch:
+  muted full row, no collapse, since forms aren't large enough that
+  scroll matters.
+- **Where the "Check out" CTA sits.** Header right (next to version
+  badge) or sticky footer. v1 sketch: header right, mirroring how
+  the draft editor's Publish sits opposite the Draft badge.
+
+**Verification target:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder src/app/(home)/forms`
+runs clean. Manual exercise: pick a published version that has
+diverged from the current draft and confirm every category (added,
+removed, modified per-field, unchanged) renders as expected,
+including a question that has been reparented.
+
+---
+
 ## Conventions
 
 These are the standards established as we built commits 1–5 and refined
@@ -1155,6 +1414,31 @@ Discussed but pushed out of the current feature scope:
     doesn't explicitly require comprehensive semantic conflict
     checking. Revisit when a user reports a conflict that the
     operator-uniqueness filter doesn't catch.
+- **Diff view between two form versions.** Originally excluded by
+  the PRD's Out of Scope. Brought back in scope as commit 11 by
+  executive decision after commit 10 landed. The historical viewer
+  is now diff-based; the read-only-question-list plan is shelved.
+  The PRD's Out of Scope section is left as-is for the audit trail;
+  this entry is the canonical record of the re-scoping.
+- **Reorder detection inside the diff.** A question whose `order`
+  changed within its parent's children but is otherwise unchanged
+  is treated as `unchanged` by `diffFormVersions` in v1. Detecting
+  reorders cleanly requires deciding which neighbours count
+  (immediate predecessor only? full sequence?) and produces
+  cascade-like noise when a single delete shifts every subsequent
+  sibling. Reparenting (`parentId` change) IS detected and
+  surfaced as a `modified` question with a `parent` field change,
+  because depth/structure changes are semantically louder than
+  same-parent reorders. Revisit when a user complains.
+- **Diff-embedded checkout sheet.** Considered for commit 11 as an
+  alternative to the small checkout-confirm-dialog from commit 10
+  — a wider `Sheet` (side panel) hosting the diff inline with a
+  destructive confirm at the bottom, matching the GitHub PR-creation
+  pattern. Dropped because the diff is already on the historical
+  viewer page behind the small confirm; double-rendering it adds
+  scroll fatigue without new information. Revisit if checkout is
+  exposed from a surface that does *not* already show the diff
+  (e.g., a "checkout this version" link from the versions list).
 
 ---
 
