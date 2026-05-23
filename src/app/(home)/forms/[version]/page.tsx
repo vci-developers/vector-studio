@@ -1,5 +1,5 @@
-import HistoricalViewerPageClient from '@/features/form-builder/components/historical-viewer-page-client';
-import HistoricalViewerShell from '@/features/form-builder/components/layout/historical-viewer-shell';
+import HistoricalViewerPageClient from '@/features/form-builder/historical-viewer/components/historical-viewer-page-client';
+import HistoricalViewerShell from '@/features/form-builder/historical-viewer/components/layout/historical-viewer-shell';
 
 interface FormVersionPageProps {
     params: Promise<{ version: string }>;

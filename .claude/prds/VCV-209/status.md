@@ -25,7 +25,7 @@ and *which conventions we've committed to as we build*.
 | 9  | Prerequisite editor                     | ✅ done           |
 | 10 | Publish + checkout dialogs              | ✅ done           |
 | 11 | Historical viewer + pre-publish diff    | ✅ done           |
-| 12 | Polish + consistency cleanup            | pending           |
+| 12 | Polish + consistency cleanup            | in progress (Phase 1 done) |
 
 ### Commit 6 — closed
 
@@ -1080,12 +1080,111 @@ including a question that has been reparented.
 
 ---
 
-### Commit 12 — planned (Polish + consistency cleanup)
+### Commit 12 — in progress (Polish + consistency cleanup)
 
-Final pass before the PR opens. Carries the polish items the plan
-already called out, plus a couple that surfaced during commits 7–11.
+Final pass before the PR opens. Split into two phases per
+[cleanup-plan.md](./cleanup-plan.md): Phase 1 is pure file
+reorganization (done); Phase 2 is the file-by-file simplification
+pass (pending).
 
-**Carried from the original plan:**
+#### Phase 1 of cleanup — closed
+
+`src/features/form-builder/` reorganized into three self-contained
+subfeatures (`form-versions-list/`, `draft-editor/`,
+`historical-viewer/`) plus a shared `components/` + `utils/` root.
+~45 files moved; `tsc --noEmit` and `eslint` clean across the
+touched paths and the three route entries.
+
+Each subfeature's `components/` folder has the page-client at the
+top level; every other component lives in a single-purpose
+subfolder (`layout/`, `loading/`, `editor/`, `question/`,
+`prerequisite/`, `publish/`, `empty-state/`, `versions-list/`,
+`viewer/`, `checkout/`, `diff/`, `error/`).
+
+**Deviations from the original cleanup-plan layout, applied
+intentionally:**
+
+- Singular `empty-state/` and `question/` instead of plural. Used
+  consistently across all three subfeatures.
+- `checkout/` in `historical-viewer/components/` instead of
+  `dialogs/`. Groups by user-facing action rather than UI
+  primitive — scales if a non-dialog checkout surface lands later.
+- `draft-editor/validation/question-form-schema.ts` retained under
+  `validation/` rather than folded into `draft-editor/utils/`. The
+  folder is the intended home for future Zod schemas; not promoted
+  out until a second consumer arrives.
+- **Renames beyond the three the plan called out:**
+  - `form-error-banner.tsx` → `form-builder-error-banner.tsx`
+    (component `FormErrorBanner` → `FormBuilderErrorBanner`).
+  - `forms-page-client.tsx` → `form-versions-page-client.tsx`
+    (component `FormsPageClient` → `FormVersionsPageClient`).
+  - `forms-page-shell.tsx` → `form-versions-page-shell.tsx`
+    (component `FormsPageShell` → `FormVersionsPageShell`).
+
+  "Form versions" is more precise than "forms" — the page lists
+  form versions, not forms.
+
+**Naming rule confirmed during the move (codebase-wide):**
+
+Files inside a single-purpose subfolder are named
+`<subfolder-noun>-<role>.tsx`, e.g. `diff/diff-summary.tsx`,
+`layout/draft-editor-shell.tsx`, `viewer/historical-viewer.tsx`,
+`prerequisite/prerequisite-predicate-row.tsx`. The folder-name
+prefix is *not* removed even though the folder context already
+implies it, because:
+
+- It matches the dominant pattern across every subfolder in the
+  feature.
+- Component names must stand alone at call sites; folder context
+  is not visible to a reader of `<PredicateRow />`, only to a
+  reader of `<PrerequisitePredicateRow />`.
+- The `filename === component-kebab` convention cascades —
+  dropping a file prefix forces dropping the component prefix,
+  which makes call sites harder to scan.
+
+Exceptions: files whose name *replaces* the folder noun with a
+more specific one (`editor/form-name-inline-edit.tsx`,
+`question/options-editor.tsx`) rather than dropping it.
+
+**Renames still on the table, not yet applied:**
+
+- `draft-editor/components/empty-state/empty-draft-form-state.tsx`
+  → `no-questions-empty-state.tsx`. The component's own copy reads
+  "No questions yet"; it's not an "empty draft form" state (the
+  draft exists), it's a "no questions in this draft" state. Also
+  matches the sibling `no-current-form-empty-state.tsx` suffix
+  pattern under `form-versions-list/components/empty-state/`.
+- `draft-editor/components/question/question-sheet.tsx` →
+  `question-form-sheet.tsx`. The sheet hosts the question form;
+  the longer name disambiguates from `question-card`,
+  `question-list`, `question-form` in the same folder.
+
+**Outstanding fix:**
+
+[src/app/(home)/forms/page.tsx:1](../../../src/app/(home)/forms/page.tsx#L1)
+still uses the old local alias `FormsPageClient` for what is now
+`FormVersionsPageClient`. Runtime-safe (default imports alias
+locally) but inconsistent with every other call site. Rename the
+local to `FormVersionsPageClient`.
+
+#### Phase 2 of cleanup — pending
+
+File-by-file simplification per [cleanup-plan.md §Phase 2](./cleanup-plan.md#phase-2--file-by-file-cleanup-no-behavior-change).
+Ordered small-blast-radius first, big-util-refactor last:
+
+1. Skeleton dedupe within each subfeature.
+2. Comment + `<Fragment>` audit.
+3. Drop the `try/catch` in `question-card.tsx` (conditional on
+   verifying `usePutQuestionToDraftForm.mutateAsync` never throws,
+   or until the codebase-wide `fetchXxx` hardening lands).
+4. `question-form.tsx` CRUD branching inline.
+5. Variable / helper renames (`move` → `swapWithSibling`, etc.).
+6. `prerequisite-editor.tsx` + `prerequisite-predicate-row.tsx`
+   readability pass.
+7. `form-version-diff.ts` slimming, verified by hand-built fixture
+   pairs (added / modified / reparented).
+
+**Carried from the original plan (run alongside or after Phase 2):**
 
 - Loading skeletons wired wherever an initial load occurs (verify
   versions list, draft editor, historical viewer, publish sheet).

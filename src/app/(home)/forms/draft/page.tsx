@@ -1,5 +1,5 @@
-import DraftEditorPageClient from "@/features/form-builder/components/draft-editor-page-client";
-import DraftEditorShell from "@/features/form-builder/components/layout/draft-editor-shell";
+import DraftEditorPageClient from '@/features/form-builder/draft-editor/components/draft-editor-page-client';
+import DraftEditorShell from '@/features/form-builder/draft-editor/components/layout/draft-editor-shell';
 
 export default function DraftFormPage() {
     return (
