@@ -1,9 +1,6 @@
 'use client';
 
-import type {
-    FormQuestion,
-    FormQuestionType,
-} from '@/api/form-question/contracts/form-question-schema';
+import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import { usePutQuestionToDraftForm } from '@/api/form-question/hooks/use-put-question-to-draft-form';
 import type { Form } from '@/api/form/contracts/form-schema';
 import { Fragment, useState } from 'react';
@@ -32,14 +29,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-const QUESTION_TYPE_LABELS: Record<FormQuestionType, string> = {
-    text: 'Short text',
-    number: 'Number',
-    boolean: 'Yes / No',
-    select: 'Dropdown',
-    date: 'Date',
-};
+import { QUESTION_TYPE_LABELS } from '../../utils/question-type-labels';
 
 interface QuestionCardProps {
     question: FormQuestion;

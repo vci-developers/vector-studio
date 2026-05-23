@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 interface DraftEditorHeaderProps {
     programId: number;
     draft: Form;
-    onOpenPublishDialog: () => void;
+    onOpenPublishSheet: () => void;
 }
 
 export default function DraftEditorHeader({
     programId,
     draft,
-    onOpenPublishDialog,
+    onOpenPublishSheet,
 }: DraftEditorHeaderProps) {
     return (
         <Card className="gap-0 p-0">
@@ -29,7 +29,7 @@ export default function DraftEditorHeader({
                         <span aria-hidden="true">·</span>
                         <span>Unpublished</span>
                     </div>
-                    <Button type="button" onClick={onOpenPublishDialog}>
+                    <Button type="button" onClick={onOpenPublishSheet}>
                         Publish
                     </Button>
                 </div>

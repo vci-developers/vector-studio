@@ -9,7 +9,7 @@ import DeleteQuestionDialog from './delete-question-dialog';
 import QuestionSheet from './question-sheet';
 import DraftEditorHeader from './draft-editor-header';
 import QuestionList from './question-list';
-import PublishDialog from './publish-dialog';
+import PublishSheet from './publish-sheet';
 
 interface DraftEditorProps {
     programId: number;
@@ -30,7 +30,7 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
     >(null);
     const [questionPendingDeletion, setQuestionPendingDeletion] =
         useState<FormQuestion | null>(null);
-    const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+    const [isPublishSheetOpen, setIsPublishSheetOpen] = useState(false);
 
     if (!getDraftFormByProgramIdResult || isGetDraftFormByProgramIdPending) {
         return <DraftEditorSkeleton />;
@@ -55,7 +55,7 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
             <DraftEditorHeader
                 programId={programId}
                 draft={draft}
-                onOpenPublishDialog={() => setIsPublishDialogOpen(true)}
+                onOpenPublishSheet={() => setIsPublishSheetOpen(true)}
             />
             <QuestionList
                 draft={draft}
@@ -83,10 +83,11 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
                 draft={draft}
                 onClose={() => setQuestionPendingDeletion(null)}
             />
-            <PublishDialog
-                isOpen={isPublishDialogOpen}
+            <PublishSheet
+                isOpen={isPublishSheetOpen}
                 programId={programId}
-                onClose={() => setIsPublishDialogOpen(false)}
+                draftForm={draft}
+                onClose={() => setIsPublishSheetOpen(false)}
             />
         </div>
     );

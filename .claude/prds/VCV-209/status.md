@@ -24,7 +24,7 @@ and *which conventions we've committed to as we build*.
 | 8  | Draft editor (shell, rename, CRUD)      | ✅ done           |
 | 9  | Prerequisite editor                     | ✅ done           |
 | 10 | Publish + checkout dialogs              | ✅ done           |
-| 11 | Historical viewer (diff-based)          | pending           |
+| 11 | Historical viewer + pre-publish diff    | ✅ done           |
 | 12 | Polish + consistency cleanup            | pending           |
 
 ### Commit 6 — closed
@@ -816,7 +816,109 @@ runs clean.
 
 ---
 
-### Commit 11 — planned (Historical viewer, diff-based)
+### Commit 11 — closed
+
+Shipped a GitHub-style diff between two form versions, used in two
+surfaces: the historical viewer (versus the current draft) and a new
+publish sheet that previews changes versus the current published
+version before commit.
+
+**Files shipped:**
+
+- `utils/form-version-diff.ts` — recursive diff. Two-pass matching:
+  pass 1 by question id (global lookup — catches reparenting), pass
+  2 by weighted structural similarity within each level for
+  questions left unmatched. Similarity weights: Dice coefficient on
+  bigrams of normalised labels × 5, type match +2, sibling-position
+  +1, options Jaccard +1, required +0.5. Threshold 5 — exact label
+  alone (Dice = 1 → 5) is enough to pair, pure same-type-same-
+  position (no label overlap) lands at 3 and falls through to
+  add+remove. The similarity pass exists because checkout and
+  publish copy questions with fresh ids, and id-only matching would
+  otherwise show every post-checkout question as add+remove.
+- `utils/question-type-labels.ts` — `QUESTION_TYPE_LABELS` lifted
+  out of `draft-editor/question-card.tsx` once it reached a third
+  call site (diff-question-card label, type field-change row).
+- `components/historical-viewer-page-client.tsx` — perms gate,
+  mirrors `draft-editor-page-client.tsx`.
+- `components/historical-viewer/historical-viewer.tsx` — owns the
+  draft + viewed queries, computes the diff, composes header /
+  summary / list / checkout dialog.
+- `components/historical-viewer/historical-viewer-header.tsx`,
+  `diff-summary.tsx`, `diff-question-list.tsx`,
+  `diff-question-card.tsx`, `diff-field-change-row.tsx`,
+  `diff-scalar-change.tsx` — the diff UI. One component per file.
+- `components/loading/historical-viewer-skeleton.tsx`,
+  `components/layout/historical-viewer-shell.tsx` — skeleton + page
+  shell, parallel to the draft editor's.
+- `app/(home)/forms/[version]/page.tsx` — server entry composing
+  shell + client.
+- `components/draft-editor/publish-sheet.tsx` (replaces
+  `publish-dialog.tsx`) — pre-publish diff sheet. Reuses
+  `<DiffSummary>` and `<DiffQuestionList>` against
+  `(currentPublishedForm, draftForm)`. shadcn `Sheet`, not
+  `Dialog`, because the diff content is too tall for a centred
+  modal.
+
+**In scope by extension:**
+
+- **Pre-publish diff.** Not in the original plan; brought in mid-
+  commit after the historical viewer's diff primitives were
+  factored. The publish flow now surfaces the same diff before
+  commit, using identical UI components. The old simple-confirm
+  `publish-dialog.tsx` was retired.
+
+**Deviations from the original plan:**
+
+- **One named type only.** The plan listed seven (`QuestionDiff`,
+  `FormVersionDiff`, `QuestionDiffKind`, three field-change shapes,
+  `QuestionFieldChanges`). Reduced to a single recursive
+  `QuestionDiff` exported from `form-version-diff.ts`. Everything
+  else is structural / inline / accessed via `QuestionDiff['kind']`
+  indexed access. The recursive type *must* be named; the rest
+  violated the "no intermediate types outside contract schemas"
+  rule.
+- **`fromForm` / `toForm` prop names.** Originally drafted with
+  historical-viewer-specific names (`draftForm`, `viewedForm`). When
+  the publish sheet became the second consumer, the prop names were
+  generalised and the diff util's parameters followed.
+- **Label-equivalent comparison for question references.** Parent
+  and prerequisite-`questionId` comparisons dereference ids to
+  question labels and compare labels rather than raw ids. After
+  publish/checkout the ids are fresh on each side; the resolved
+  labels still match, so reparenting and prerequisite references
+  survive the id rotation. Captured trade-off in deferred
+  decisions.
+- **`DiffScalarChange` extracted to its own file.** Originally a
+  same-file sub-component inside `diff-question-card.tsx`; pulled
+  out once the card used it four times — the
+  "one-component-per-file" convention plus "extract on reuse" both
+  triggered.
+- **`historical-viewer-shell.tsx` added.** Parallels
+  `draft-editor-shell.tsx`. The plan implied the shell pattern but
+  didn't name the file.
+
+**Algorithm notes for future readers:**
+
+- `buildDiffsForLevel(toQuestions, fromQuestions)` takes both arrays
+  directly — *not* a from-side parentId-keyed map. That earlier
+  shape had a subtle bug where similarity-matched parents (different
+  ids on each side) lost access to their from-side children at the
+  next recursion level. Walking subtrees through the matched pair's
+  `subQuestions` on both sides eliminates the problem and removes a
+  helper.
+- Field-change comparisons for `parent` and `prerequisite` use
+  `areQuestionReferencesLabelEquivalent`, which dereferences the id
+  to a question label and compares labels. Handles the fresh-id
+  post-checkout case without needing a global match map.
+- Greedy similarity matching at each level: walk all candidate
+  pairs, pick the highest-scoring pair above threshold, mark them
+  consumed, repeat. O(n³) worst case but n is at most a few dozen
+  siblings.
+
+---
+
+### Commit 11 — original plan (Historical viewer, diff-based)
 
 Renamed and rescoped from "Historical viewer" — the diff view that
 the PRD's Out of Scope explicitly deferred is now in scope. Replaces
@@ -975,6 +1077,69 @@ runs clean. Manual exercise: pick a published version that has
 diverged from the current draft and confirm every category (added,
 removed, modified per-field, unchanged) renders as expected,
 including a question that has been reparented.
+
+---
+
+### Commit 12 — planned (Polish + consistency cleanup)
+
+Final pass before the PR opens. Carries the polish items the plan
+already called out, plus a couple that surfaced during commits 7–11.
+
+**Carried from the original plan:**
+
+- Loading skeletons wired wherever an initial load occurs (verify
+  versions list, draft editor, historical viewer, publish sheet).
+- Every mutation surfaces failures via toast and preserves the
+  user's in-progress edits — no navigation away on failure.
+- A11y pass on the dialog, sheet, inline edit, and diff components.
+  Focus rings visible, keyboard navigation end-to-end, screen-
+  reader labels for the diff marker column.
+- `npx tsc --noEmit && npx eslint && yarn format` clean on the
+  whole touched set.
+
+**Picked up during execution:**
+
+- **`fetchXxx` hardening codebase-wide.** Each `fetchXxx` should
+  return `{ ok: false, error: { kind: 'network' } }` on `fetch` /
+  `response.json()` throw rather than letting it bubble. Fixes the
+  perpetually-loading state on back-then-forward navigation. See
+  the deferred-decision entry for the longer write-up.
+- **Per-modified-question split (optional).** Reformat the
+  field-change panel inside `diff-question-card.tsx` as a two-
+  column `Was | Now` block at sheet widths above some breakpoint.
+  Retains the unified tree but gives a localised split feel where
+  detail is densest. About 20 lines across
+  `diff-question-card.tsx` + `diff-scalar-change.tsx`. Worth doing
+  only if the unified field-change row reads as cramped in
+  practice.
+- **Filter chips on the diff.** "All / Modified / Added / Removed"
+  toggle above the diff list, lets reviewers scan a large diff for
+  one category. Cheap (filter the rendered `questionDiffs` array)
+  and useful for big forms. Worth doing only if the diff is hard to
+  scan with manual exercise.
+
+**Verification target:**
+
+After commit 12, manually exercise the full set of PRD use cases
+against `Default Surveillance Form v1.0.6`:
+
+- Versions list renders current / draft / previous in the documented
+  order.
+- Uganda-program empty state appears for `programId === 1`.
+- Question CRUD (add, edit, delete, reorder, follow-up) saves
+  automatically and surfaces toasts on failure.
+- Delete on a depended-on question is blocked with the dependent
+  list.
+- Prerequisite editor restricts operators by referenced question
+  type, shapes the value input correctly, renders the live preview.
+- Question with `not` or nested-group prereq renders view-only.
+- Historical viewer's diff renders added / removed / modified /
+  unchanged / reparented correctly. Post-checkout revisit reads as
+  all-unchanged (similarity matching working).
+- Publish sheet's diff renders against current published. First-
+  publish state shows the friendly card. Already-used version name
+  blocks publish. On success: toast + redirect to `/forms` + the
+  new version appears as current.
 
 ---
 
@@ -1272,8 +1437,12 @@ to feel sturdy, learnable in one sitting, and never punish a mistake.
   needs to be keyboard-navigable end to end.
 - **Inline editing for single-field changes** (the form name in the
   draft editor header). **Drawers for multi-field flows** (add /
-  edit question, prerequisite editor) — they keep the question list
-  visible underneath. Modals only for confirmations and publish.
+  edit question, prerequisite editor, publish review) — they keep
+  context visible while editing or reviewing. **Modals for short
+  confirmations** (delete a question, replace draft on checkout).
+  Publish was originally a modal; it became a sheet in commit 11
+  once it gained the pre-publish diff — review content doesn't fit
+  in a centred modal.
 - **Live previews where the user is composing structure.** The
   prerequisite editor's natural-language sentence updates as the user
   edits; it is the contract between the user's intent and the rule
@@ -1439,6 +1608,33 @@ Discussed but pushed out of the current feature scope:
   scroll fatigue without new information. Revisit if checkout is
   exposed from a surface that does *not* already show the diff
   (e.g., a "checkout this version" link from the versions list).
+- **Prerequisite-rename cascade.** Commit 11 compares prerequisite
+  `questionId` references by resolving them to the referenced
+  question's *label* (so post-publish/checkout id rotation doesn't
+  flag every dependent as changed). The trade-off: when a referenced
+  question is genuinely renamed (e.g., "Date of birth" → "DOB"), the
+  question itself shows the label change, and every dependent also
+  shows a `prerequisite` field change because the resolved label
+  text differs. Arguably correct — the dependent's prereq display
+  *does* change — but it's noisy. The cleaner fix is a global
+  matching map (toId ↔ fromId) populated in a pre-pass and consulted
+  by the comparison functions, which would make the comparison
+  id-aware without relying on label text. Deferred because the
+  current cascade is acceptable and the pre-pass adds ~50 lines.
+  Revisit if users complain about the cascade noise.
+- **Side-by-side (split) diff view.** Considered as a polish item
+  for commit 12. Dropped from the polish scope. Tree-structured
+  diffs don't split cleanly into two columns — alignment breaks
+  whenever one side has a denser subtree, and the sheet's
+  `max-w-3xl` width forces aggressive label truncation at half-
+  width. The unified view already conveys the same information
+  density via the per-field `Was: / Now:` rows inside modified
+  questions. Smaller-scope polish path that retains the split feel:
+  reformat the per-modified-question field-change panel as a two-
+  column `Was | Now` block at wider sheet widths (≈20 lines in
+  `diff-question-card.tsx` + `diff-scalar-change.tsx`). That's a
+  commit-12 polish candidate; full tree-level split is deferred
+  indefinitely.
 
 ---
 
