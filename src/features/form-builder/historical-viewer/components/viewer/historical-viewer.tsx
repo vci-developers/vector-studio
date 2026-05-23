@@ -92,6 +92,8 @@ export default function HistoricalViewer({
                     questionDiffs={formVersionDiff.questionDiffs}
                     fromForm={draftForm}
                     toForm={viewedForm}
+                    fromColumnLabel="Your draft"
+                    toColumnLabel={`Version ${viewedForm.version}`}
                 />
             )}
             <CheckoutConfirmDialog

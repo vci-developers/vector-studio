@@ -138,7 +138,7 @@ export default function PublishSheet({
         >
             <SheetContent
                 side="right"
-                className="flex w-full flex-col gap-0 sm:max-w-3xl"
+                className="flex w-full flex-col gap-0 data-[side=right]:sm:max-w-6xl"
             >
                 <SheetHeader className="border-b">
                     <SheetTitle className="text-base">
@@ -201,6 +201,8 @@ export default function PublishSheet({
                                 questionDiffs={formVersionDiff.questionDiffs}
                                 fromForm={currentPublishedForm}
                                 toForm={draftForm}
+                                fromColumnLabel={`Version ${currentPublishedForm.version}`}
+                                toColumnLabel="Your draft"
                             />
                         </div>
                     ) : null}
@@ -214,7 +216,7 @@ export default function PublishSheet({
                         <Input
                             id="publish-sheet-version"
                             value={pendingVersion}
-                            placeholder="e.g. v1.0.7"
+                            placeholder="e.g. 1.0.0"
                             autoComplete="off"
                             disabled={isPublishDraftFormForProgramPending}
                             aria-invalid={isVersionAlreadyUsed}

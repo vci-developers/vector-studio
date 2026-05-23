@@ -10,7 +10,8 @@ import type { Form } from '@/api/form/contracts/form-schema';
 
 export type QuestionDiff = {
     kind: 'unchanged' | 'added' | 'removed' | 'modified';
-    question: FormQuestion;
+    fromQuestion: FormQuestion | null;
+    toQuestion: FormQuestion | null;
     fieldChanges: {
         label?: { from: string; to: string };
         type?: { from: FormQuestionType; to: FormQuestionType };
@@ -46,7 +47,8 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
             .sort((a, b) => a.order - b.order);
         return {
             kind: 'added',
-            question: addedToQuestion,
+            fromQuestion: null,
+            toQuestion: addedToQuestion,
             fieldChanges: {},
             children: subQuestionsInOrder.map(buildAddedSubtree),
         };
@@ -66,7 +68,8 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
             );
         return {
             kind: 'removed',
-            question: removedFromQuestion,
+            fromQuestion: removedFromQuestion,
+            toQuestion: null,
             fieldChanges: {},
             children: trulyRemovedChildrenInOrder.map(buildRemovedSubtree),
         };
@@ -167,7 +170,8 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
                     diffSummary.unchanged++;
                     diffsAtThisLevel.push({
                         kind: 'unchanged',
-                        question: toQuestion,
+                        fromQuestion: matchedFromQuestion,
+                        toQuestion: toQuestion,
                         fieldChanges: {},
                         children: childDiffs,
                     });
@@ -175,7 +179,8 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
                     diffSummary.modified++;
                     diffsAtThisLevel.push({
                         kind: 'modified',
-                        question: toQuestion,
+                        fromQuestion: matchedFromQuestion,
+                        toQuestion: toQuestion,
                         fieldChanges,
                         children: childDiffs,
                     });
