@@ -1,5 +1,5 @@
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
+import { ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
 
 interface HistoricalViewerShellProps {
     children: React.ReactNode;
@@ -28,5 +28,5 @@ export default function HistoricalViewerShell({
             </header>
             {children}
         </div>
-    )
+    );
 }

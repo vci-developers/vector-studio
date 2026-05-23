@@ -31,8 +31,6 @@ import FormBuilderErrorBanner from '../../../components/error/form-builder-error
 import DiffQuestionList from '../../../components/diff/diff-question-list';
 import DiffSummary from '../../../components/diff/diff-summary';
 
-const DRAFT_VERSION_TOKEN = '';
-
 interface PublishSheetProps {
     isOpen: boolean;
     programId: number;
@@ -65,7 +63,7 @@ export default function PublishSheet({
 
     const previouslyPublishedForms = getFormsByProgramIdResult?.ok
         ? getFormsByProgramIdResult.data.forms
-              .filter(form => form.version !== DRAFT_VERSION_TOKEN)
+              .filter(form => form.version !== '')
               .sort((a, b) => b.createdAt - a.createdAt)
         : null;
     const latestPublishedVersion =

@@ -1,34 +1,39 @@
 'use client';
 
 import { useGetUserPermissions } from '@/api/user/hooks/use-get-user-permissions';
-import FormBuilderErrorBanner from '@/features/form-builder/components/error/form-builder-error-banner';
-import FormVersionsListSkeleton from '@/features/form-builder/form-versions-list/components/loading/form-versions-list-skeleton';
-import UgandaProgramEmptyState from '@/features/form-builder/components/empty-state/uganda-program-empty-state';
-import FormVersionsList from './versions-list/form-versions-list';
+import FormBuilderErrorBanner from '../error/form-builder-error-banner';
+import UgandaProgramEmptyState from '../empty-state/uganda-program-empty-state';
 
 // TODO: This is the seeded legacy form structure. Remove this gate once it migrates.
 const UGANDA_PROGRAM_ID = 1;
 
-export default function FormVersionsPageClient() {
+interface ProgramGateProps {
+    skeleton: React.ReactNode;
+    children: (programId: number) => React.ReactNode;
+}
+
+export default function ProgramGate({ skeleton, children }: ProgramGateProps) {
     const {
         data: getUserPermissionsResult,
         isPending: isGetUserPermissionsPending,
         refetch: refetchUserPermissions,
     } = useGetUserPermissions();
 
-    if (!getUserPermissionsResult || isGetUserPermissionsPending)
-        return <FormVersionsListSkeleton />;
+    if (!getUserPermissionsResult || isGetUserPermissionsPending) {
+        return skeleton;
+    }
 
-    if (!getUserPermissionsResult.ok)
+    if (!getUserPermissionsResult.ok) {
         return (
             <FormBuilderErrorBanner
                 title="We couldn't load your permissions"
-                error={getUserPermissionsResult?.error ?? { kind: 'unknown' }}
+                error={getUserPermissionsResult.error}
                 onRetry={() => {
                     void refetchUserPermissions();
                 }}
             />
         );
+    }
 
     const { programId } = getUserPermissionsResult.data;
 
@@ -36,5 +41,5 @@ export default function FormVersionsPageClient() {
         return <UgandaProgramEmptyState />;
     }
 
-    return <FormVersionsList programId={programId} />;
+    return children(programId);
 }

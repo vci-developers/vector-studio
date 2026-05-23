@@ -2,7 +2,7 @@ import type { FormQuestion } from '@/api/form-question/contracts/form-question-s
 import type { Form } from '@/api/form/contracts/form-schema';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import NoQuestionsEmptyFormState from '../empty-state/no-questions-empty-state';
+import NoQuestionsEmptyState from '../empty-state/no-questions-empty-state';
 import { Card } from '@/components/ui/card';
 import QuestionCard from './question-card';
 
@@ -41,7 +41,7 @@ export default function QuestionList({
                 )}
             </div>
             {rootQuestions.length === 0 ? (
-                <NoQuestionsEmptyFormState
+                <NoQuestionsEmptyState
                     onAddQuestion={() => onAddQuestion(null)}
                 />
             ) : (

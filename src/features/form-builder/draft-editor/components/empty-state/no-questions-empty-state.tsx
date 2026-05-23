@@ -11,7 +11,7 @@ interface NoQuestionsEmptyStateProps {
     onAddQuestion: () => void;
 }
 
-export default function NoQuestionsEmptyFormState({
+export default function NoQuestionsEmptyState({
     onAddQuestion,
 }: NoQuestionsEmptyStateProps) {
     return (

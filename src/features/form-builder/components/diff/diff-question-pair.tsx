@@ -1,6 +1,7 @@
 import type { Form } from '@/api/form/contracts/form-schema';
 import type { QuestionDiff } from '../../utils/form-version-diff';
 import DiffQuestionCell from './diff-question-cell';
+import { Fragment } from 'react';
 
 interface DiffQuestionPairProps {
     questionDiff: QuestionDiff;
@@ -22,7 +23,7 @@ export default function DiffQuestionPair({
         depth > 0 ? { marginLeft: `${depth * 24}px` } : undefined;
 
     return (
-        <>
+        <Fragment>
             <div style={cellIndentStyle}>
                 {fromQuestion ? (
                     <DiffQuestionCell
@@ -62,6 +63,6 @@ export default function DiffQuestionPair({
                     depth={depth + 1}
                 />
             ))}
-        </>
+        </Fragment>
     );
 }

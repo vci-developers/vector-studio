@@ -11,8 +11,6 @@ import { format } from 'date-fns';
 import PreviousVersionsEmptyState from '../empty-state/previous-versions-empty-state';
 import { Card } from '@/components/ui/card';
 
-const DRAFT_VERSION_TOKEN = '';
-
 interface PreviousVersionsSectionProps {
     programId: number;
 }
@@ -54,11 +52,7 @@ export default function PreviousVersionsSection({
             <VersionsSection label="Previously published">
                 <FormBuilderErrorBanner
                     title="Couldn't load published versions"
-                    error={
-                        getFormsByProgramIdResult.error ?? {
-                            kind: 'unknown',
-                        }
-                    }
+                    error={getFormsByProgramIdResult.error}
                     onRetry={() => {
                         void refetchFormsByProgramId();
                     }}
@@ -73,9 +67,7 @@ export default function PreviousVersionsSection({
 
     const previouslyPublishedForms = getFormsByProgramIdResult.data.forms
         .filter(
-            form =>
-                form.version !== DRAFT_VERSION_TOKEN &&
-                form.version !== currentFormVersion,
+            form => form.version !== '' && form.version !== currentFormVersion,
         )
         .sort((a, b) => b.createdAt - a.createdAt);
 
