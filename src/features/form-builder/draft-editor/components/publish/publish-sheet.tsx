@@ -101,7 +101,7 @@ export default function PublishSheet({
         return diffFormVersions(currentPublishedForm, draftForm);
     }, [currentPublishedForm, draftForm]);
 
-    function publish() {
+    function confirmPublish() {
         if (isPublishDisabled) return;
         publishDraftFormForProgram(
             { programId, requestBody: { version: trimmedVersion } },
@@ -224,7 +224,7 @@ export default function PublishSheet({
                             onKeyDown={event => {
                                 if (event.key === 'Enter') {
                                     event.preventDefault();
-                                    publish();
+                                    confirmPublish();
                                 }
                             }}
                         />
@@ -258,7 +258,7 @@ export default function PublishSheet({
                         </Button>
                         <Button
                             type="button"
-                            onClick={publish}
+                            onClick={confirmPublish}
                             disabled={isPublishDisabled}
                         >
                             {isPublishDraftFormForProgramPending && (

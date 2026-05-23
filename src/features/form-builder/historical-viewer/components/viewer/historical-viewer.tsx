@@ -22,61 +22,65 @@ export default function HistoricalViewer({
     version,
 }: HistoricalViewerProps) {
     const {
-        data: getViewedFormResult,
-        isPending: isGetViewedFormPending,
-        refetch: refetchViewedForm,
+        data: getProgramFormByVersionResult,
+        isPending: isGetProgramFormByVersionPending,
+        refetch: refetchProgramFormByVersion,
     } = useGetProgramFormByVersion(programId, version);
     const {
-        data: getDraftFormResult,
-        isPending: isGetDraftFormPending,
-        refetch: refetchDraftForm,
+        data: getDraftFormByProgramIdResult,
+        isPending: isGetDraftFormByProgramIdPending,
+        refetch: refetchDraftFormByProgramId,
     } = useGetDraftFormByProgramId(programId);
 
     const [formToCheckout, setFormToCheckout] = useState<Form | null>(null);
 
     const formVersionDiff = useMemo(() => {
-        if (!getViewedFormResult?.ok || !getDraftFormResult?.ok) return null;
+        if (
+            !getProgramFormByVersionResult?.ok ||
+            !getDraftFormByProgramIdResult?.ok
+        )
+            return null;
         return diffFormVersions(
-            getDraftFormResult.data,
-            getViewedFormResult.data,
+            getDraftFormByProgramIdResult.data,
+            getProgramFormByVersionResult.data,
         );
-    }, [getViewedFormResult, getDraftFormResult]);
+    }, [getProgramFormByVersionResult, getDraftFormByProgramIdResult]);
 
     if (
-        !getViewedFormResult ||
-        isGetViewedFormPending ||
-        !getDraftFormResult ||
-        isGetDraftFormPending
+        !getProgramFormByVersionResult ||
+        isGetProgramFormByVersionPending ||
+        !getDraftFormByProgramIdResult ||
+        isGetDraftFormByProgramIdPending
     ) {
         return <HistoricalViewerSkeleton />;
     }
 
-    if (!getViewedFormResult.ok) {
+    if (!getProgramFormByVersionResult.ok) {
         return (
             <FormBuilderErrorBanner
                 title={`Couldn't load version ${version}`}
-                error={getViewedFormResult.error}
+                error={getProgramFormByVersionResult.error}
                 onRetry={() => {
-                    void refetchViewedForm();
+                    void refetchProgramFormByVersion();
                 }}
             />
         );
     }
 
-    if (!getDraftFormResult.ok) {
+    if (!getDraftFormByProgramIdResult.ok) {
         return (
             <FormBuilderErrorBanner
                 title="Couldn't load the draft to compare against"
-                error={getDraftFormResult.error}
+                error={getDraftFormByProgramIdResult.error}
                 onRetry={() => {
-                    void refetchDraftForm();
+                    void refetchDraftFormByProgramId();
                 }}
             />
         );
     }
 
-    const viewedForm = getViewedFormResult.data;
-    const draftForm = getDraftFormResult.data;
+    const viewedForm = getProgramFormByVersionResult.data;
+    const draftForm = getDraftFormByProgramIdResult.data;
 
     return (
         <div className="space-y-8">

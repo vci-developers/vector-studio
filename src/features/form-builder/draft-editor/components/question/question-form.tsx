@@ -14,7 +14,7 @@ import {
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment } from 'react';
-import { nextOrderFor } from '../../utils/question-order';
+import { getNextQuestionOrder } from '../../utils/question-order';
 import { toast } from 'sonner';
 import { networkErrorMessage } from '@/lib/network/network-error';
 import {
@@ -149,7 +149,7 @@ export default function QuestionForm({
                     required: values.required,
                     parentId: parentIdForNewQuestion,
                     options: normalizedOptions,
-                    order: nextOrderFor(draft),
+                    order: getNextQuestionOrder(draft),
                     prerequisite: values.prerequisite,
                 },
             },

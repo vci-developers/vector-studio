@@ -170,31 +170,49 @@ Uganda const to confirm the legacy gate still fires.
 
 ---
 
-## Phase 3 — Variable & helper renames
+## Phase 3 — Variable & helper renames ✅ done
 
-All pure identifier swaps. TypeScript catches drift.
+Scoped during implementation per the rule in
+[[feedback-specific-identifiers]]: don't shorten identifiers that carry
+load-bearing specificity, *do* lengthen identifiers that don't mirror
+their source hook or same-feature naming pattern.
 
-- [question-card.tsx:60](../../../src/features/form-builder/draft-editor/components/question/question-card.tsx#L60)
-  `move(direction)` → `swapWithSibling(direction)`.
-- [question-order.ts:4](../../../src/features/form-builder/draft-editor/utils/question-order.ts#L4)
-  `nextOrderFor(draft)` → `nextQuestionOrder(draft)`.
-- [question-order.ts:18](../../../src/features/form-builder/draft-editor/utils/question-order.ts#L18)
-  `findSiblingsContainingQuestion` → `findSiblings`.
-- [question-dependencies.ts:5](../../../src/features/form-builder/draft-editor/utils/question-dependencies.ts#L5)
-  `prerequisiteExpressionReferencesQuestion` → `referencesQuestion`.
-- [question-dependencies.ts:32](../../../src/features/form-builder/draft-editor/utils/question-dependencies.ts#L32)
-  `findDependentQuestions` → `findDependents` (matches
-  implementation-plan.md commit 6's naming).
-- [question-form.tsx:69-75](../../../src/features/form-builder/draft-editor/components/question/question-form.tsx#L69-L75)
-  `isCreateQuestionInDraftFormPending` → `isCreating`,
-  `isUpdateQuestionInDraftFormPending` → `isSaving`. After phase 4
-  these collapse into `isSubmitting` anyway; rename first for review.
-- [publish-sheet.tsx:106](../../../src/features/form-builder/draft-editor/components/publish/publish-sheet.tsx#L106)
-  `publish()` → `confirmPublish()` to match the "verb + noun" pattern
-  used in `confirmDelete`, `confirmCheckout`.
-- [historical-viewer.tsx:25-28](../../../src/features/form-builder/historical-viewer/components/viewer/historical-viewer.tsx#L25-L28)
-  `getViewedFormResult` → `getFormByVersionResult` (matches the hook
-  name `useGetProgramFormByVersion`).
+**Applied:**
+
+- [question-order.ts](../../../src/features/form-builder/draft-editor/utils/question-order.ts)
+  `nextOrderFor(draft)` → `getNextQuestionOrder(draft)`.
+- [question-order.ts](../../../src/features/form-builder/draft-editor/utils/question-order.ts)
+  `findSiblingsContainingQuestion` → `findSiblingGroup` (with
+  `candidateSiblingGroup` / `foundSiblingGroup` inside). The original
+  name's "ContainingQuestion" suffix wasn't carrying signal once the
+  function is understood to operate on the question tree; the new name
+  also more accurately describes what's returned (the *group* the
+  target belongs to, including the target itself).
+- [question-form.tsx](../../../src/features/form-builder/draft-editor/components/question/question-form.tsx)
+  import and call site of `getNextQuestionOrder` updated to match.
+- [publish-sheet.tsx](../../../src/features/form-builder/draft-editor/components/publish/publish-sheet.tsx)
+  `publish()` → `confirmPublish()` (definition + Enter handler + button
+  onClick). Matches `confirmDelete` / `confirmCheckout` pattern in the
+  same feature.
+- [historical-viewer.tsx](../../../src/features/form-builder/historical-viewer/components/viewer/historical-viewer.tsx)
+  `getViewedFormResult` → `getProgramFormByVersionResult` and
+  `getDraftFormResult` → `getDraftFormByProgramIdResult`, plus matching
+  `isGet…Pending` / `refetch…` destructure aliases. Mirrors the hook
+  names exactly per [[feedback-tanstack-query-conventions]].
+
+**Rejected (long form kept):**
+
+- `move(direction)` in question-card.tsx — `move('up')` reads naturally
+  next to the up/down arrow buttons that fire it; the underlying
+  `swapAdjacentSiblings` is the implementation detail, not the
+  intent.
+- `isCreateQuestionInDraftFormPending` /
+  `isUpdateQuestionInDraftFormPending` in question-form.tsx — the long
+  names connect each flag to its specific hook; shortening to
+  `isCreating` / `isSaving` would drop that link.
+- `findDependentQuestions` / `prerequisiteExpressionReferencesQuestion`
+  in question-dependencies.ts — both names encode the returned noun
+  and the subject of the predicate; shortening would strip both.
 
 ---
 

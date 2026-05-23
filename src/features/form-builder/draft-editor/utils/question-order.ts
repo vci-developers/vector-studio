@@ -1,7 +1,7 @@
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 
-export function nextOrderFor(draft: Form): number {
+export function getNextQuestionOrder(draft: Form): number {
     let highestExistingOrder = 0;
 
     const visitQuestion = (question: FormQuestion) => {
@@ -15,20 +15,22 @@ export function nextOrderFor(draft: Form): number {
     return highestExistingOrder + 1;
 }
 
-function findSiblingsContainingQuestion(
+function findSiblingGroup(
     targetQuestionId: number,
-    candidateSiblings: FormQuestion[] | undefined,
+    candidateSiblingGroup: FormQuestion[] | undefined,
 ): FormQuestion[] | null {
-    if (!candidateSiblings) return null;
-    if (candidateSiblings.some(question => question.id === targetQuestionId)) {
-        return candidateSiblings;
+    if (!candidateSiblingGroup) return null;
+    if (
+        candidateSiblingGroup.some(question => question.id === targetQuestionId)
+    ) {
+        return candidateSiblingGroup;
     }
-    for (const question of candidateSiblings) {
-        const foundSiblings = findSiblingsContainingQuestion(
+    for (const question of candidateSiblingGroup) {
+        const foundSiblingGroup = findSiblingGroup(
             targetQuestionId,
             question.subQuestions,
         );
-        if (foundSiblings) return foundSiblings;
+        if (foundSiblingGroup) return foundSiblingGroup;
     }
     return null;
 }
@@ -38,13 +40,10 @@ export function swapAdjacentSiblings(
     direction: 'up' | 'down',
     draft: Form,
 ): Array<{ id: number; order: number }> | null {
-    const siblings = findSiblingsContainingQuestion(
-        questionToMoveId,
-        draft.questions,
-    );
-    if (!siblings) return null;
+    const siblingGroup = findSiblingGroup(questionToMoveId, draft.questions);
+    if (!siblingGroup) return null;
 
-    const siblingsSortedByOrder = [...siblings].sort(
+    const siblingsSortedByOrder = [...siblingGroup].sort(
         (a, b) => a.order - b.order,
     );
     const questionToMoveIndex = siblingsSortedByOrder.findIndex(
