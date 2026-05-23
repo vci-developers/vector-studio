@@ -23,12 +23,14 @@ export const prerequisiteValueSchema = z.union([
     z.array(z.union([z.string(), z.number()])),
 ]);
 
+export const prerequisitePredicateSchema = z.object({
+    questionId: z.number(),
+    operator: prerequisiteOperatorSchema,
+    value: prerequisiteValueSchema.optional(),
+});
+
 export const prerequisiteExpressionSchema = z.union([
-    z.object({
-        questionId: z.number(),
-        operator: prerequisiteOperatorSchema,
-        value: prerequisiteValueSchema.optional(),
-    }),
+    prerequisitePredicateSchema,
     z.object({
         get all() {
             return z.array(prerequisiteExpressionSchema);
@@ -48,6 +50,7 @@ export const prerequisiteExpressionSchema = z.union([
 
 export type PrerequisiteOperator = z.infer<typeof prerequisiteOperatorSchema>;
 export type PrerequisiteValue = z.infer<typeof prerequisiteValueSchema>;
+export type PrerequisitePredicate = z.infer<typeof prerequisitePredicateSchema>;
 export type PrerequisiteExpression = z.infer<
     typeof prerequisiteExpressionSchema
 >;

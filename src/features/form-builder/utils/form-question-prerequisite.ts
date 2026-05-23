@@ -5,6 +5,7 @@ import type {
 import type {
     PrerequisiteExpression,
     PrerequisiteOperator,
+    PrerequisitePredicate,
     PrerequisiteValue,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
@@ -59,26 +60,64 @@ export function getPrerequisiteConnector(
 
 export function getPrerequisitePredicates(
     expression: PrerequisiteExpression | null,
-): PrerequisiteExpression[] {
+): PrerequisitePredicate[] {
     if (!expression) return [];
     if ('questionId' in expression) return [expression];
     if ('all' in expression) {
-        return expression.all.filter(branch => 'questionId' in branch);
+        return expression.all.filter(
+            (branch): branch is PrerequisitePredicate => 'questionId' in branch,
+        );
     }
     if ('any' in expression) {
-        return expression.any.filter(branch => 'questionId' in branch);
+        return expression.any.filter(
+            (branch): branch is PrerequisitePredicate => 'questionId' in branch,
+        );
     }
     return [];
 }
 
 export function buildPrerequisite(
     connector: 'all' | 'any',
-    predicates: PrerequisiteExpression[],
+    predicates: PrerequisitePredicate[],
 ): PrerequisiteExpression | null {
     const [firstPredicate, ...remainingPredicates] = predicates;
     if (!firstPredicate) return null;
     if (remainingPredicates.length === 0) return firstPredicate;
     return connector === 'all' ? { all: predicates } : { any: predicates };
+}
+
+export function getDefaultValueForPredicate(
+    referencedQuestion: FormQuestion,
+    operator: PrerequisiteOperator,
+): PrerequisiteValue | undefined {
+    if (operator === 'empty' || operator === 'not_empty') return undefined;
+    if (operator === 'in' || operator === 'not_in') return [];
+    switch (referencedQuestion.type) {
+        case 'text':
+            return '';
+        case 'number':
+            return 0;
+        case 'boolean':
+            return true;
+        case 'select':
+            return referencedQuestion.options?.[0] ?? '';
+        case 'date':
+            return new Date().toISOString().slice(0, 10);
+    }
+}
+
+export function getOperatorsUsedOnQuestion(
+    predicates: PrerequisitePredicate[],
+    targetQuestionId: number,
+    excludingPredicateIndex: number | null,
+): PrerequisiteOperator[] {
+    return predicates
+        .filter(
+            (predicate, predicateIndex) =>
+                predicateIndex !== excludingPredicateIndex &&
+                predicate.questionId === targetQuestionId,
+        )
+        .map(predicate => predicate.operator);
 }
 
 function findQuestionById(

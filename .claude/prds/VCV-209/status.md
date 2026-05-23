@@ -22,7 +22,7 @@ and *which conventions we've committed to as we build*.
 | 7  | Versions list page                      | ✅ done           |
 | 7.5| Design-language pass (interim)          | ✅ done           |
 | 8  | Draft editor (shell, rename, CRUD)      | ✅ done           |
-| 9  | Prerequisite editor                     | pending           |
+| 9  | Prerequisite editor                     | ✅ done           |
 | 10 | Publish + checkout dialogs              | pending           |
 | 11 | Historical viewer                       | pending           |
 | 12 | Polish + consistency cleanup            | pending           |
@@ -544,11 +544,235 @@ runs clean.
 
 ---
 
+### Commit 9 — closed
+
+Prerequisite (visibility-rule) editor integrated into the question
+form sheet. Authors flat AND/OR rules over the contract's
+`PrerequisiteExpression` using natural-language operator labels,
+type-aware value inputs, and a live preview sentence. Any existing
+rule that uses `not` or nested groups falls through to a read-only
+summary. Same-`(questionId, operator)` pairs are blocked within a
+single rule; cross-operator semantic conflicts on the same question
+are deferred (see Deferred decisions).
+
+**File layout:**
+
+- [x] `validation/question-form-schema.ts` — adds `prerequisite:
+      prerequisiteExpressionSchema.nullable()` so the field round-trips
+      through RHF + `zodResolver`.
+- [x] `api/form-question/contracts/prerequisite-expression-schema.ts` —
+      extracts a named `prerequisitePredicateSchema` from the union's
+      predicate member; exports a `PrerequisitePredicate` type so util
+      and component signatures can narrow to predicates instead of the
+      whole union.
+- [x] `utils/form-question-prerequisite.ts` — adds
+      `getDefaultValueForPredicate(referencedQuestion, operator)`
+      (sensible starting value per question type + operator shape) and
+      `getOperatorsUsedOnQuestion(predicates, targetQuestionId,
+      excludingPredicateIndex)` (operators in use on a given question
+      by other predicates). Existing helpers (`OPERATOR_LABELS`,
+      `OPERATORS_BY_QUESTION_TYPE`, `isPrerequisiteEditable`,
+      `getPrerequisiteConnector`, `getPrerequisitePredicates`,
+      `buildPrerequisite`, `describePrerequisite`) unchanged.
+- [x] `components/draft-editor/prerequisite-editor.tsx` — top-level.
+      Reads `connector` and `predicates` from the wire shape via util
+      getters; rebuilds the wire shape via `buildPrerequisite` on every
+      change. Branches: read-only `<PrerequisiteComplexRuleSummary>`
+      when `!isPrerequisiteEditable`; "Always shown" empty state with
+      a disabled "Add condition" when no question can be referenced;
+      otherwise the authoring UI with an inline connector toggle (when
+      2+ predicates), the predicate list, "Add condition", and the
+      live preview sentence.
+- [x] `components/draft-editor/prerequisite-predicate-row.tsx` —
+      single predicate row. Three controls (question select, operator
+      select, value input) plus a remove button. Operator dropdown
+      filters out operators already used on the same question by other
+      predicates; question dropdown filters out questions whose
+      operator slots are fully covered by other predicates.
+      `changeReferencedQuestion` picks the first non-conflicting
+      operator for the new question's type; `changeOperator` always
+      resets the value via `getDefaultValueForPredicate`.
+- [x] `components/draft-editor/prerequisite-value-input.tsx` — branches
+      on operator first (value-less for `empty`/`not_empty` → renders
+      null; list for `in`/`not_in` → chip toggles over the select
+      question's own options), then on referenced question type
+      (boolean → Yes/No Select; select → option Select; number →
+      `<Input type="number">`; date → `<Input type="date">`; text →
+      text Input).
+- [x] `components/draft-editor/prerequisite-complex-rule-summary.tsx` —
+      Lock icon + "Complex rule — view only" outline badge + the
+      `describePrerequisite` sentence + a short explanation pointing
+      the user at a form administrator. Renders only when the existing
+      rule contains `not` or nested groups; the rest of the question's
+      fields remain editable and submit preserves the original rule
+      verbatim.
+- [x] `components/draft-editor/question-form.tsx` — drops the
+      `EyeOff`-styled "coming next" stub; threads `prerequisite`
+      through RHF defaults, both submit branches, and a `<Controller>`
+      wrapping `<PrerequisiteEditor>`.
+
+**Component hierarchy:**
+
+```
+<QuestionForm>
+  └─ <Controller name="prerequisite">
+        └─ <PrerequisiteEditor draft questionBeingEdited expression onChange>
+              ├─ <PrerequisiteComplexRuleSummary />          (non-editable rule)
+              └─ (editable rule)
+                    ├─ connector Select                       (when 2+ predicates)
+                    ├─ <PrerequisitePredicateRow … />         (per predicate)
+                    │     └─ <PrerequisiteValueInput … />
+                    ├─ "Add condition" Button
+                    └─ live preview sentence
+```
+
+**Deviations from the plan:**
+
+- **Folder layout flat under `draft-editor/`**, not nested under
+  `draft-editor/prerequisite-editor/` as the plan called out. All
+  four new components sit at the same level as `question-form.tsx`
+  and `question-card.tsx`. Avoids a sub-sub-folder for a five-file
+  feature.
+- **Fewer files than the plan listed.** The plan separated
+  `connector-toggle`, `operator-select`, `question-select`, and
+  `preview-sentence` into their own components. The connector toggle
+  and preview sentence are inlined into the editor as ~10 lines each;
+  the question and operator selects are inlined into the predicate
+  row. Single-use composites under the "Combine where granularity
+  exceeds reuse value" convention.
+- **No editor model / intermediate type.** The plan's
+  `parsePrerequisite` / `serializePrerequisite` pair plus a named
+  `EditorPrerequisite` were rejected for the same reason as commit 6
+  — the editor reads `connector` and `predicates` from the contract
+  via `getPrerequisiteConnector` / `getPrerequisitePredicates` on
+  every render, and writes back via `buildPrerequisite`. The contract
+  is the only named shape.
+- **No `operatorsForQuestionType` wrapper.** Components read
+  `OPERATORS_BY_QUESTION_TYPE[question.type]` directly, same as
+  commit 6.
+- **Preserve-value-when-operator-shape-unchanged dropped.** An
+  earlier cut held a `getOperatorValueShape` util used solely to
+  decide whether to preserve the previous value when switching
+  between two scalar operators (e.g., `eq` → `neq`). Dropped per the
+  "only utils if absolutely needed" rule — used at exactly one call
+  site, and inlining the boolean checks at that site was uglier than
+  resetting the value to the type-appropriate default on every
+  operator change. Minor UX cost (`eq 5` → `neq 5` loses the 5) is
+  acceptable.
+- **No closure-recursive walk utility for collecting referencable
+  questions.** Inline closure-recursive `forEach` lives inside the
+  editor body — same idiom as the existing util-internal walkers in
+  `form-question-dependencies.ts` and `form-question-order.ts`, but
+  located at the call site since it's single-use.
+- **No module-level helper functions in component files.** Earlier
+  drafts had `collectQuestionsExcludingSelf`,
+  `defaultValueForPredicate`, and `operatorValueShape` defined at the
+  top of `prerequisite-editor.tsx` / `prerequisite-predicate-row.tsx`.
+  Moved into utils where they justified a shared helper
+  (`getDefaultValueForPredicate`, `getOperatorsUsedOnQuestion`) and
+  inlined the rest.
+- **`value` prop → domain-specific names.** Disambiguated based on
+  what each prop actually holds:
+  `PrerequisiteEditor.prerequisiteExpression`,
+  `PrerequisiteValueInput.predicateValue`,
+  `PrerequisiteComplexRuleSummary.prerequisiteExpression`. The
+  callback names follow the same pattern
+  (`onPrerequisiteExpressionChange`, `onPredicateValueChange`,
+  `onPredicateChange`, `onRemovePredicate`).
+- **Conflict prevention scoped to same-`(questionId, operator)`
+  pairs.** Two predicates with identical question + operator are
+  blocked via three filters (operator dropdown + question dropdown +
+  `addPredicate` skip) and "Add condition" disables when no
+  non-conflicting combination remains. Cross-operator semantic
+  conflicts on the same question (e.g., `Q1 lt 3 AND Q1 gt 5`,
+  `Q1 empty AND Q1 has been answered`) are NOT detected — see
+  Deferred decisions.
+
+**Assumptions and requirements that held:**
+
+- **Boundary read helpers + single write helper.** Operating directly
+  on the contract via `getPrerequisiteConnector`,
+  `getPrerequisitePredicates`, and `buildPrerequisite` (introduced in
+  commit 6) keeps the editor stateful without naming any intermediate
+  type.
+- **`PrerequisiteValueInput` returns `null` for value-less
+  operators.** `empty` and `not_empty` render nothing on the right;
+  the row reads cleanly as `[question] [has been answered] [×]`.
+- **Read helpers default to ALL.** `getPrerequisiteConnector` returns
+  `'all'` for a null expression or a single predicate, matching the
+  default-ALL UX from the PRD.
+- **Complex rules round-trip unchanged.** Because RHF defaults
+  `prerequisite` to `questionBeingEdited.prerequisite ?? null` and
+  the read-only summary exposes no edit affordance, submitting an
+  edited "complex rule" question sends the original prerequisite
+  back to upstream verbatim — confirmed by the partial PUT schema.
+- **Row's current value is always in the filtered dropdowns.** Both
+  the operator and question filters exclude *the row's own
+  predicate*, so the predicate's current `(questionId, operator)` is
+  never filtered out from its own dropdowns — the Select primitive
+  always finds a matching option to display.
+
+**Verification:**
+
+`npx tsc --noEmit && npx eslint src/features/form-builder src/api/form-question`
+runs clean.
+
+---
+
 ## Conventions
 
 These are the standards established as we built commits 1–5 and refined
 through review. Apply them to every new file unless the conversation
 explicitly overrides one.
+
+### Implementation rules (apply to every commit)
+
+These rules govern how the work is done, not what it produces. They
+hold across every commit, every file, every iteration. If a pattern
+elsewhere in this document would violate one of these rules, the rule
+wins.
+
+- **Descriptive variable names.** Every identifier must convey what
+  it holds. Use `prerequisiteExpression`, not `value`; `predicateValue`,
+  not `v`; `referencedQuestion`, not `q`; `firstReferencableQuestion`,
+  not `first`. If a reader has to consult the type to understand the
+  variable, the name is wrong. This applies to props, locals, callback
+  parameters, and destructured pieces.
+- **Minimal implementation.** Build only what the current step
+  requires. No speculative scaffolding, no "we'll probably want X
+  later," no helper layers waiting for a second consumer, no flag-
+  guarded experimental code paths. Three similar lines beats a
+  premature abstraction. When the diff stays small, the system stays
+  legible.
+- **No direct file changes when producing code for review.** Code
+  for the active commit is presented in the response and applied by
+  the user. Direct edits are reserved for documentation updates
+  (this file, ADRs) and for narrowly scoped fix-up requests the user
+  explicitly authorizes.
+- **No intermediate types outside the main domain models.** The
+  contract schemas under `src/api/<resource>/contracts/` are the only
+  named data shapes. Components and utilities operate directly on
+  those types — no "editor models," no `EditorPrerequisite`, no
+  flattened intermediate views. React-state pieces stay as primitive
+  destructured fields without naming the composite. Component props
+  interfaces are fine; they describe a component's surface, not a
+  reusable data shape.
+- **Utility functions only when absolutely necessary.** A util in
+  `src/features/<feature>/utils/` earns its place only when the
+  alternative is real duplication across multiple files. The
+  established bar: ~3 call sites across ≥2 files of non-trivial
+  logic (see `getDefaultValueForPredicate`,
+  `getOperatorsUsedOnQuestion`). A 3-line helper used once is
+  inlined. A helper used twice within a single file is inlined or
+  expressed as a closure inside the consuming function. No
+  speculative utilities, no `parse`/`serialize` pairs, no factory
+  functions, no module-level helpers defined inside component files.
+- **No overengineering.** If the natural expression is a 5-line
+  inline computation, that is the expression. If the natural
+  expression is a 15-line cross-file switch, that earns a util.
+  Nothing in between gets abstracted. Premature flexibility (options
+  parameters, hooks-as-props, generic wrappers) is rejected by
+  default and only added when the second real consumer materializes.
 
 ### Architecture (project-wide)
 
@@ -907,6 +1131,30 @@ Discussed but pushed out of the current feature scope:
   `!data || isPending` check until then. A specific Next.js App
   Router + TanStack interaction is the second-most-likely culprit
   for the back-button bug if the `fetchXxx` fix doesn't resolve it.
+- **Cross-operator semantic conflict detection for visibility-rule
+  predicates.** Commit 9 prevents two predicates with the same
+  `(questionId, operator)` pair within a single rule, but it does
+  not detect contradictions across *different* operators on the same
+  question. Two known unhandled cases:
+  - **Empty/value contradictions**: `Q1 has been answered AND Q1 is
+    empty` (`not_empty` + `empty`), or `empty` combined with any
+    value-bearing operator on the same question. Always contradictory
+    under the ALL connector regardless of values.
+  - **Range overlap contradictions**: `Q1 less than 3 AND Q1 greater
+    than 5` — non-overlapping ranges leave no satisfying answer.
+    Detecting these requires value-aware comparison across
+    `gt`/`gte`/`lt`/`lte`, plus similar checks for `eq` against
+    ranges, `eq` against `in`/`not_in`, and so on.
+  - Two implementation paths were on the table: **(a)** restrict to
+    one predicate per question (eliminates every same-question
+    conflict in one shot but loses range queries like
+    `Q1 gt 5 AND Q1 lt 10`), or **(b)** implement value-aware conflict
+    detection across the operator pairs that can semantically
+    conflict. Both deferred — the partial fix from commit 9 catches
+    the most common case (exact-duplicate predicates) and the v1 PRD
+    doesn't explicitly require comprehensive semantic conflict
+    checking. Revisit when a user reports a conflict that the
+    operator-uniqueness filter doesn't catch.
 
 ---
 

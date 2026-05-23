@@ -14,7 +14,6 @@ import {
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment } from 'react';
-import { describePrerequisite } from '../../utils/form-question-prerequisite';
 import { nextOrderFor } from '../../utils/form-question-order';
 import { toast } from 'sonner';
 import { networkErrorMessage } from '@/lib/network/network-error';
@@ -34,10 +33,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { EyeOff, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import OptionsEditor from './options-editor';
+import PrerequisiteEditor from './prerequisite-editor';
 
 const QUESTION_TYPE_OPTIONS: Array<{ value: FormQuestionType; label: string }> =
     [
@@ -82,12 +82,14 @@ export default function QuestionForm({
                   type: questionBeingEdited.type,
                   required: questionBeingEdited.required,
                   options: questionBeingEdited.options ?? [],
+                  prerequisite: questionBeingEdited.prerequisite,
               }
             : {
                   label: '',
                   type: 'text',
                   required: false,
                   options: [],
+                  prerequisite: null,
               },
     });
     const selectedQuestionType = useWatch({
@@ -95,9 +97,6 @@ export default function QuestionForm({
         name: 'type',
     });
 
-    const prerequisitePreview = questionBeingEdited
-        ? describePrerequisite(questionBeingEdited.prerequisite, draft)
-        : null;
     const isSubmitting =
         isCreateQuestionInDraftFormPending ||
         isUpdateQuestionInDraftFormPending;
@@ -116,6 +115,7 @@ export default function QuestionForm({
                         type: values.type,
                         required: values.required,
                         options: normalizedOptions,
+                        prerequisite: values.prerequisite,
                     },
                 },
                 {
@@ -150,7 +150,7 @@ export default function QuestionForm({
                     parentId: parentIdForNewQuestion,
                     options: normalizedOptions,
                     order: nextOrderFor(draft),
-                    prerequisite: null,
+                    prerequisite: values.prerequisite,
                 },
             },
             {
@@ -243,28 +243,6 @@ export default function QuestionForm({
                                 </Field>
                             )}
                         />
-                        <Controller
-                            name="required"
-                            control={questionForm.control}
-                            render={({ field }) => (
-                                <Field orientation="horizontal">
-                                    <div className="flex-1">
-                                        <FieldLabel htmlFor="question-form-required">
-                                            Required
-                                        </FieldLabel>
-                                        <FieldDescription>
-                                            Field workers cannot submit the
-                                            session without answering this.
-                                        </FieldDescription>
-                                    </div>
-                                    <Switch
-                                        id="question-form-required"
-                                        checked={field.value}
-                                        onCheckedChange={field.onChange}
-                                    />
-                                </Field>
-                            )}
-                        />
                         {selectedQuestionType === 'select' && (
                             <Controller
                                 name="options"
@@ -287,24 +265,51 @@ export default function QuestionForm({
                                 )}
                             />
                         )}
-                        <Field>
-                            <FieldLabel>Visibility rule</FieldLabel>
-                            <div className="border-border bg-muted/30 text-muted-foreground flex items-start gap-3 rounded-md border p-3 text-sm">
-                                <EyeOff className="mt-0.5 size-4 shrink-0" />
-                                <div className="space-y-1">
-                                    <p className="text-foreground font-medium">
-                                        {prerequisitePreview
-                                            ? 'Shown when ' +
-                                              prerequisitePreview
-                                            : 'Always shown'}
-                                    </p>
-                                    <p>
-                                        Visibility rules can be edited from the
-                                        dedicated editor — coming next.
-                                    </p>
-                                </div>
-                            </div>
-                        </Field>
+                        <Controller
+                            name="required"
+                            control={questionForm.control}
+                            render={({ field }) => (
+                                <Field orientation="horizontal">
+                                    <div className="flex-1">
+                                        <FieldLabel htmlFor="question-form-required">
+                                            Required
+                                        </FieldLabel>
+                                        <FieldDescription>
+                                            Field workers cannot submit the
+                                            session without answering this.
+                                        </FieldDescription>
+                                    </div>
+                                    <Switch
+                                        id="question-form-required"
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                    />
+                                </Field>
+                            )}
+                        />
+                        <Controller
+                            name="prerequisite"
+                            control={questionForm.control}
+                            render={({ field }) => (
+                                <Field>
+                                    <FieldLabel>Visibility rule</FieldLabel>
+                                    <FieldDescription>
+                                        Hide this question unless answers to
+                                        other questions match the rule below.
+                                    </FieldDescription>
+                                    <PrerequisiteEditor
+                                        draft={draft}
+                                        questionBeingEdited={
+                                            questionBeingEdited
+                                        }
+                                        prerequisiteExpression={field.value}
+                                        onPrerequisiteExpressionChange={
+                                            field.onChange
+                                        }
+                                    />
+                                </Field>
+                            )}
+                        />
                     </FieldGroup>
                 </form>
             </div>
