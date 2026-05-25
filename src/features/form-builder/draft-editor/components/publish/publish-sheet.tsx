@@ -20,16 +20,16 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
 import { networkErrorMessage } from '@/lib/network/network-error';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { diffFormVersions } from '../../../utils/form-version-diff';
+import { computeFormVersionDiff } from '../../../utils/form-version-diff';
 import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
 import DiffQuestionList from '../../../components/diff/diff-question-list';
 import DiffSummary from '../../../components/diff/diff-summary';
+import PublishDiffSkeleton from '../loading/publish-diff-skeleton';
 
 interface PublishSheetProps {
     isOpen: boolean;
@@ -98,7 +98,7 @@ export default function PublishSheet({
 
     const formVersionDiff = useMemo(() => {
         if (!currentPublishedForm) return null;
-        return diffFormVersions(currentPublishedForm, draftForm);
+        return computeFormVersionDiff(currentPublishedForm, draftForm);
     }, [currentPublishedForm, draftForm]);
 
     function confirmPublish() {
@@ -152,30 +152,10 @@ export default function PublishSheet({
                     <h3 className="text-muted-foreground mb-3 text-xs font-semibold tracking-wide uppercase">
                         Changes since current published version
                     </h3>
-                    {isGetCurrentPublishedFormPending ? (
-                        <div className="space-y-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <Skeleton className="h-6 w-20" />
-                                <Skeleton className="h-6 w-24" />
-                                <Skeleton className="h-6 w-24" />
-                            </div>
-                            <Card className="gap-0 p-0">
-                                {[0, 1, 2].map(skeletonRowIndex => (
-                                    <div
-                                        key={skeletonRowIndex}
-                                        className="flex items-start gap-3 border-l-4 border-l-transparent px-4 py-3.5"
-                                    >
-                                        <Skeleton className="size-5 shrink-0" />
-                                        <div className="flex-1 space-y-2">
-                                            <Skeleton className="h-4 w-64" />
-                                            <Skeleton className="h-3 w-44" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </Card>
-                        </div>
+                    {!getCurrentPublishedFormResult ||
+                    isGetCurrentPublishedFormPending ? (
+                        <PublishDiffSkeleton />
                     ) : hasUnexpectedCurrentFormError &&
-                      getCurrentPublishedFormResult &&
                       !getCurrentPublishedFormResult.ok ? (
                         <FormBuilderErrorBanner
                             title="Couldn't load the current published version"

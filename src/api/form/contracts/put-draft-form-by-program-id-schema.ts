@@ -17,4 +17,5 @@ export type PutDraftFormByProgramIdRequestBody = z.infer<
 export type PutDraftFormByProgramIdResponseBody = z.infer<
     typeof putDraftFormByProgramIdResponseSchema
 >;
-export type PutDraftFormByProgramIdSuccessPayload = PutDraftFormByProgramIdResponseBody
+export type PutDraftFormByProgramIdSuccessPayload =
+    PutDraftFormByProgramIdResponseBody;

@@ -2,7 +2,6 @@
 
 import { useGetCurrentFormByProgramId } from '@/api/form/hooks/use-get-current-form-by-program-id';
 import VersionsSection from './versions-section';
-import { Skeleton } from '@/components/ui/skeleton';
 import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
 import { useGetFormsByProgramId } from '@/api/form/hooks/use-get-forms-by-program-id';
 import Link from 'next/link';
@@ -10,6 +9,7 @@ import { ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import PreviousVersionsEmptyState from '../empty-state/previous-versions-empty-state';
 import { Card } from '@/components/ui/card';
+import PreviousVersionsSkeleton from '../loading/previous-versions-skeleton';
 
 interface PreviousVersionsSectionProps {
     programId: number;
@@ -29,20 +29,7 @@ export default function PreviousVersionsSection({
     if (!getFormsByProgramIdResult || isGetFormsByProgramIdPending) {
         return (
             <VersionsSection label="Previously published">
-                <Card className="divide-border gap-0 divide-y p-0">
-                    {[0, 1].map(i => (
-                        <div
-                            key={i}
-                            className="flex items-center gap-4 px-4 py-3.5"
-                        >
-                            <div className="flex-1 space-y-2">
-                                <Skeleton className="h-4 w-52" />
-                                <Skeleton className="h-3 w-36" />
-                            </div>
-                            <Skeleton className="size-4 shrink-0" />
-                        </div>
-                    ))}
-                </Card>
+                <PreviousVersionsSkeleton />
             </VersionsSection>
         );
     }

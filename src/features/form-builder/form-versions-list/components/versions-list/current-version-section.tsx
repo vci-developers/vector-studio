@@ -2,13 +2,13 @@
 
 import { useGetCurrentFormByProgramId } from '@/api/form/hooks/use-get-current-form-by-program-id';
 import VersionsSection from './versions-section';
-import { Skeleton } from '@/components/ui/skeleton';
 import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
 import { format } from 'date-fns';
 import NoCurrentFormEmptyState from '../empty-state/no-current-form-empty-state';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import CurrentVersionSkeleton from '../loading/current-version-skeleton';
 
 interface CurrentVersionSectionProps {
     programId: number;
@@ -29,21 +29,19 @@ export default function CurrentVersionSection({
     ) {
         return (
             <VersionsSection label="Current version">
-                <Card className="gap-0 p-0">
-                    <div className="flex items-center gap-4 px-4 py-3.5">
-                        <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-56" />
-                            <Skeleton className="h-3 w-40" />
-                        </div>
-                        <Skeleton className="size-4 shrink-0" />
-                    </div>
-                </Card>
+                <CurrentVersionSkeleton />
             </VersionsSection>
         );
     }
 
     if (!getCurrentFormByProgramIdResult.ok) {
-        if (getCurrentFormByProgramIdResult.error.kind !== 'not_found') {
+        if (getCurrentFormByProgramIdResult.error.kind === 'not_found') {
+            return (
+                <VersionsSection label="Current version">
+                    <NoCurrentFormEmptyState />
+                </VersionsSection>
+            );
+        } else {
             return (
                 <VersionsSection label="Current version">
                     <FormBuilderErrorBanner
@@ -57,12 +55,6 @@ export default function CurrentVersionSection({
                             void refetchCurrentFormByProgramId();
                         }}
                     />
-                </VersionsSection>
-            );
-        } else {
-            return (
-                <VersionsSection label="Current version">
-                    <NoCurrentFormEmptyState />
                 </VersionsSection>
             );
         }
@@ -83,10 +75,7 @@ export default function CurrentVersionSection({
                                 {currentForm.name}
                             </span>
                             <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs font-medium">
-                                <span
-                                    className="bg-success size-1.5 rounded-full"
-                                    aria-hidden="true"
-                                />
+                                <span className="bg-success size-1.5 rounded-full" aria-hidden="true" />
                                 Active
                             </span>
                         </div>

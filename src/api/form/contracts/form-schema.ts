@@ -8,7 +8,7 @@ export const formSchema = z.object({
     version: z.string(),
     createdAt: z.number(),
     updatedAt: z.number(),
-    questions: z.array(formQuestionSchema).optional()
+    questions: z.array(formQuestionSchema).optional(),
 });
 
 export type Form = z.infer<typeof formSchema>;

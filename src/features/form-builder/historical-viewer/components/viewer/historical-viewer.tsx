@@ -3,7 +3,7 @@
 import { useGetDraftFormByProgramId } from '@/api/form/hooks/use-get-draft-form-by-program-id';
 import { useGetProgramFormByVersion } from '@/api/form/hooks/use-get-program-form-by-version';
 import { useMemo, useState } from 'react';
-import { diffFormVersions } from '../../../utils/form-version-diff';
+import { computeFormVersionDiff } from '../../../utils/form-version-diff';
 import HistoricalViewerSkeleton from '../loading/historical-viewer-skeleton';
 import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
 import DiffSummary from '../../../components/diff/diff-summary';
@@ -40,7 +40,7 @@ export default function HistoricalViewer({
             !getDraftFormByProgramIdResult?.ok
         )
             return null;
-        return diffFormVersions(
+        return computeFormVersionDiff(
             getDraftFormByProgramIdResult.data,
             getProgramFormByVersionResult.data,
         );

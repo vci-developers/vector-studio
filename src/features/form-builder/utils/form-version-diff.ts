@@ -8,6 +8,7 @@ import type {
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from './walk-questions';
+import { computeSimilarityScore } from './question-diff-similarity';
 
 export type QuestionDiff = {
     kind: 'unchanged' | 'added' | 'removed' | 'modified';
@@ -32,7 +33,7 @@ export type QuestionDiff = {
 
 const SIMILARITY_THRESHOLD = 5;
 
-export function diffFormVersions(fromForm: Form, toForm: Form) {
+export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
     const fromQuestionsById = new Map<number, FormQuestion>();
     walkQuestions(fromForm.questions, question =>
         fromQuestionsById.set(question.id, question),
@@ -45,93 +46,61 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
 
     const diffSummary = { added: 0, removed: 0, modified: 0, unchanged: 0 };
 
-    function buildAddedSubtree(addedToQuestion: FormQuestion): QuestionDiff {
+    function buildAddedSubtree(addedQuestion: FormQuestion): QuestionDiff {
         diffSummary.added++;
-        const subQuestionsInOrder = (addedToQuestion.subQuestions ?? [])
-            .slice()
-            .sort((a, b) => a.order - b.order);
         return {
             kind: 'added',
             fromQuestion: null,
-            toQuestion: addedToQuestion,
+            toQuestion: addedQuestion,
             fieldChanges: {},
-            children: subQuestionsInOrder.map(buildAddedSubtree),
+            children: sortByOrder(addedQuestion.subQuestions).map(
+                buildAddedSubtree,
+            ),
         };
     }
 
-    function buildRemovedSubtree(
-        removedFromQuestion: FormQuestion,
-    ): QuestionDiff {
+    function buildRemovedSubtree(removedQuestion: FormQuestion): QuestionDiff {
         diffSummary.removed++;
-        const trulyRemovedChildrenInOrder = (
-            removedFromQuestion.subQuestions ?? []
-        )
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .filter(
-                fromChildQuestion => !toQuestionsById.has(fromChildQuestion.id),
-            );
         return {
             kind: 'removed',
-            fromQuestion: removedFromQuestion,
+            fromQuestion: removedQuestion,
             toQuestion: null,
             fieldChanges: {},
-            children: trulyRemovedChildrenInOrder.map(buildRemovedSubtree),
+            children: sortByOrder(removedQuestion.subQuestions).map(
+                buildRemovedSubtree,
+            ),
         };
     }
 
-    function buildDiffsForLevel(
-        toQuestionsAtThisLevel: FormQuestion[] | undefined,
-        fromQuestionsAtThisLevel: FormQuestion[] | undefined,
+    function buildSiblingDiffs(
+        fromSiblings: FormQuestion[] | undefined,
+        toSiblings: FormQuestion[] | undefined,
     ): QuestionDiff[] {
-        const toQuestionsInOrder = (toQuestionsAtThisLevel ?? [])
-            .slice()
-            .sort((a, b) => a.order - b.order);
-        const fromQuestionsInOrder = (fromQuestionsAtThisLevel ?? [])
-            .slice()
-            .sort((a, b) => a.order - b.order);
+        const sortedFromSiblings = sortByOrder(fromSiblings);
+        const sortedToSiblings = sortByOrder(toSiblings);
 
         const matchedFromByToQuestion = new Map<FormQuestion, FormQuestion>();
-
-        for (const toQuestion of toQuestionsInOrder) {
-            const idMatchingFromQuestion = fromQuestionsById.get(toQuestion.id);
-            if (idMatchingFromQuestion) {
-                matchedFromByToQuestion.set(toQuestion, idMatchingFromQuestion);
-            }
-        }
-
-        const consumedFromForSimilarity = new Set<FormQuestion>();
-        const eligibleUnmatchedToQuestions = toQuestionsInOrder.filter(
-            toQuestion => !matchedFromByToQuestion.has(toQuestion),
-        );
-        const eligibleUnmatchedFromQuestions = fromQuestionsInOrder.filter(
-            fromQuestion => !toQuestionsById.has(fromQuestion.id),
-        );
+        const unmatchedToSiblings = [...sortedToSiblings];
+        const unmatchedFromSiblings = [...sortedFromSiblings];
 
         while (
-            eligibleUnmatchedToQuestions.length > 0 &&
-            eligibleUnmatchedFromQuestions.length > 0
+            unmatchedToSiblings.length > 0 &&
+            unmatchedFromSiblings.length > 0
         ) {
             let highestPairScore = SIMILARITY_THRESHOLD;
             let bestToIndex = -1;
             let bestFromIndex = -1;
-            for (
-                let toIndex = 0;
-                toIndex < eligibleUnmatchedToQuestions.length;
-                toIndex++
-            ) {
-                const candidateToQuestion =
-                    eligibleUnmatchedToQuestions[toIndex]!;
+            for (const [
+                toIndex,
+                candidateToQuestion,
+            ] of unmatchedToSiblings.entries()) {
                 const candidateToPosition =
-                    toQuestionsInOrder.indexOf(candidateToQuestion);
-                for (
-                    let fromIndex = 0;
-                    fromIndex < eligibleUnmatchedFromQuestions.length;
-                    fromIndex++
-                ) {
-                    const candidateFromQuestion =
-                        eligibleUnmatchedFromQuestions[fromIndex]!;
-                    const candidateFromPosition = fromQuestionsInOrder.indexOf(
+                    sortedToSiblings.indexOf(candidateToQuestion);
+                for (const [
+                    fromIndex,
+                    candidateFromQuestion,
+                ] of unmatchedFromSiblings.entries()) {
+                    const candidateFromPosition = sortedFromSiblings.indexOf(
                         candidateFromQuestion,
                     );
                     const pairScore = computeSimilarityScore(
@@ -148,32 +117,30 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
                 }
             }
             if (bestToIndex < 0) break;
-            const pairedToQuestion = eligibleUnmatchedToQuestions[bestToIndex]!;
-            const pairedFromQuestion =
-                eligibleUnmatchedFromQuestions[bestFromIndex]!;
-            matchedFromByToQuestion.set(pairedToQuestion, pairedFromQuestion);
-            consumedFromForSimilarity.add(pairedFromQuestion);
-            eligibleUnmatchedToQuestions.splice(bestToIndex, 1);
-            eligibleUnmatchedFromQuestions.splice(bestFromIndex, 1);
+            const matchedToQuestion = unmatchedToSiblings[bestToIndex]!;
+            const matchedFromQuestion = unmatchedFromSiblings[bestFromIndex]!;
+            matchedFromByToQuestion.set(matchedToQuestion, matchedFromQuestion);
+            unmatchedToSiblings.splice(bestToIndex, 1);
+            unmatchedFromSiblings.splice(bestFromIndex, 1);
         }
 
-        const diffsAtThisLevel: QuestionDiff[] = [];
-        for (const toQuestion of toQuestionsInOrder) {
+        const siblingDiffs: QuestionDiff[] = [];
+        for (const toQuestion of sortedToSiblings) {
             const matchedFromQuestion = matchedFromByToQuestion.get(toQuestion);
             if (matchedFromQuestion) {
-                const fieldChanges = computeFieldChangesBetween(
+                const fieldChanges = computeFieldChanges(
                     matchedFromQuestion,
                     toQuestion,
                     fromQuestionsById,
                     toQuestionsById,
                 );
-                const childDiffs = buildDiffsForLevel(
-                    toQuestion.subQuestions,
+                const childDiffs = buildSiblingDiffs(
                     matchedFromQuestion.subQuestions,
+                    toQuestion.subQuestions,
                 );
                 if (Object.keys(fieldChanges).length === 0) {
                     diffSummary.unchanged++;
-                    diffsAtThisLevel.push({
+                    siblingDiffs.push({
                         kind: 'unchanged',
                         fromQuestion: matchedFromQuestion,
                         toQuestion: toQuestion,
@@ -182,7 +149,7 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
                     });
                 } else {
                     diffSummary.modified++;
-                    diffsAtThisLevel.push({
+                    siblingDiffs.push({
                         kind: 'modified',
                         fromQuestion: matchedFromQuestion,
                         toQuestion: toQuestion,
@@ -191,107 +158,31 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
                     });
                 }
             } else {
-                diffsAtThisLevel.push(buildAddedSubtree(toQuestion));
+                siblingDiffs.push(buildAddedSubtree(toQuestion));
             }
         }
 
-        for (const fromQuestion of fromQuestionsInOrder) {
-            if (consumedFromForSimilarity.has(fromQuestion)) continue;
-            if (toQuestionsById.has(fromQuestion.id)) continue;
-            diffsAtThisLevel.push(buildRemovedSubtree(fromQuestion));
+        const matchedFromSiblings = new Set(matchedFromByToQuestion.values());
+        for (const fromQuestion of sortedFromSiblings) {
+            if (matchedFromSiblings.has(fromQuestion)) continue;
+            siblingDiffs.push(buildRemovedSubtree(fromQuestion));
         }
 
-        return diffsAtThisLevel;
+        return siblingDiffs;
     }
 
-    const questionDiffs = buildDiffsForLevel(
-        toForm.questions,
+    const questionDiffs = buildSiblingDiffs(
         fromForm.questions,
+        toForm.questions,
     );
     return { questionDiffs, summary: diffSummary };
 }
 
-function computeSimilarityScore(
-    fromQuestion: FormQuestion,
-    toQuestion: FormQuestion,
-    fromPositionInLevel: number,
-    toPositionInLevel: number,
-): number {
-    let score = 0;
-
-    const labelSimilarity = computeDiceCoefficient(
-        normalizeLabelForComparison(fromQuestion.label),
-        normalizeLabelForComparison(toQuestion.label),
-    );
-    score += 5 * labelSimilarity;
-
-    if (fromQuestion.type === toQuestion.type) score += 2;
-
-    if (fromPositionInLevel === toPositionInLevel) score += 1;
-
-    const fromQuestionOptions = fromQuestion.options ?? [];
-    const toQuestionOptions = toQuestion.options ?? [];
-    if (fromQuestionOptions.length > 0 || toQuestionOptions.length > 0) {
-        score += computeJaccardSimilarity(
-            fromQuestionOptions,
-            toQuestionOptions,
-        );
-    }
-
-    if (fromQuestion.required === toQuestion.required) score += 0.5;
-
-    return score;
+function sortByOrder(questions: FormQuestion[] | undefined): FormQuestion[] {
+    return (questions ?? []).slice().sort((a, b) => a.order - b.order);
 }
 
-function normalizeLabelForComparison(label: string): string {
-    return label.trim().toLowerCase();
-}
-
-function computeDiceCoefficient(
-    firstLabel: string,
-    secondLabel: string,
-): number {
-    if (firstLabel === secondLabel) return 1;
-    if (firstLabel.length < 2 || secondLabel.length < 2) return 0;
-    const firstBigrams = collectCharacterBigrams(firstLabel);
-    const secondBigrams = collectCharacterBigrams(secondLabel);
-    let bigramIntersectionCount = 0;
-    for (const bigram of firstBigrams) {
-        if (secondBigrams.has(bigram)) bigramIntersectionCount++;
-    }
-    return (
-        (2 * bigramIntersectionCount) / (firstBigrams.size + secondBigrams.size)
-    );
-}
-
-function collectCharacterBigrams(label: string): Set<string> {
-    const bigrams = new Set<string>();
-    for (
-        let bigramStartIndex = 0;
-        bigramStartIndex < label.length - 1;
-        bigramStartIndex++
-    ) {
-        bigrams.add(label.slice(bigramStartIndex, bigramStartIndex + 2));
-    }
-    return bigrams;
-}
-
-function computeJaccardSimilarity(
-    firstOptions: string[],
-    secondOptions: string[],
-): number {
-    const firstSet = new Set(firstOptions);
-    const secondSet = new Set(secondOptions);
-    let intersectionCount = 0;
-    for (const item of firstSet) {
-        if (secondSet.has(item)) intersectionCount++;
-    }
-    const unionSize = firstSet.size + secondSet.size - intersectionCount;
-    if (unionSize === 0) return 0;
-    return intersectionCount / unionSize;
-}
-
-function computeFieldChangesBetween(
+function computeFieldChanges(
     fromQuestion: FormQuestion,
     toQuestion: FormQuestion,
     fromQuestionsById: Map<number, FormQuestion>,
@@ -334,7 +225,7 @@ function computeFieldChangesBetween(
     }
 
     if (
-        !arePrerequisitesEquivalent(
+        !arePrerequisiteExpressionsEquivalent(
             fromQuestion.prerequisite,
             toQuestion.prerequisite,
             fromQuestionsById,
@@ -372,11 +263,8 @@ function resolveParentSummary(
     questionsById: Map<number, FormQuestion>,
 ): { id: number; label: string } | null {
     if (parentQuestionId === null) return null;
-    const parentQuestion = questionsById.get(parentQuestionId);
-    return {
-        id: parentQuestionId,
-        label: parentQuestion?.label ?? `Question ${parentQuestionId}`,
-    };
+    const parentQuestion = questionsById.get(parentQuestionId)!;
+    return { id: parentQuestionId, label: parentQuestion.label };
 }
 
 function areQuestionReferencesLabelEquivalent(
@@ -393,83 +281,68 @@ function areQuestionReferencesLabelEquivalent(
     }
     const fromReferencedQuestion = fromQuestionsById.get(
         fromReferencedQuestionId,
-    );
-    const toReferencedQuestion = toQuestionsById.get(toReferencedQuestionId);
-    if (!fromReferencedQuestion || !toReferencedQuestion) return false;
+    )!;
+    const toReferencedQuestion = toQuestionsById.get(toReferencedQuestionId)!;
     return fromReferencedQuestion.label === toReferencedQuestion.label;
 }
 
-function arePrerequisitesEquivalent(
-    firstPrerequisite: PrerequisiteExpression | null,
-    secondPrerequisite: PrerequisiteExpression | null,
-    fromQuestionsById: Map<number, FormQuestion>,
-    toQuestionsById: Map<number, FormQuestion>,
-): boolean {
-    if (firstPrerequisite === null && secondPrerequisite === null) return true;
-    if (firstPrerequisite === null || secondPrerequisite === null) return false;
-    return arePrerequisiteExpressionsEquivalent(
-        firstPrerequisite,
-        secondPrerequisite,
-        fromQuestionsById,
-        toQuestionsById,
-    );
-}
-
 function arePrerequisiteExpressionsEquivalent(
-    firstExpression: PrerequisiteExpression,
-    secondExpression: PrerequisiteExpression,
+    fromExpression: PrerequisiteExpression | null,
+    toExpression: PrerequisiteExpression | null,
     fromQuestionsById: Map<number, FormQuestion>,
     toQuestionsById: Map<number, FormQuestion>,
 ): boolean {
-    if ('questionId' in firstExpression && 'questionId' in secondExpression) {
+    if (fromExpression === null && toExpression === null) return true;
+    if (fromExpression === null || toExpression === null) return false;
+    if ('questionId' in fromExpression && 'questionId' in toExpression) {
         if (
             !areQuestionReferencesLabelEquivalent(
-                firstExpression.questionId,
-                secondExpression.questionId,
+                fromExpression.questionId,
+                toExpression.questionId,
                 fromQuestionsById,
                 toQuestionsById,
             )
         ) {
             return false;
         }
-        if (firstExpression.operator !== secondExpression.operator) {
+        if (fromExpression.operator !== toExpression.operator) {
             return false;
         }
         return arePrerequisiteValuesEqual(
-            firstExpression.value,
-            secondExpression.value,
+            fromExpression.value,
+            toExpression.value,
         );
     }
-    if ('all' in firstExpression && 'all' in secondExpression) {
-        if (firstExpression.all.length !== secondExpression.all.length) {
+    if ('all' in fromExpression && 'all' in toExpression) {
+        if (fromExpression.all.length !== toExpression.all.length) {
             return false;
         }
-        return firstExpression.all.every((branch, branchIndex) =>
+        return fromExpression.all.every((branch, branchIndex) =>
             arePrerequisiteExpressionsEquivalent(
                 branch,
-                secondExpression.all[branchIndex]!,
+                toExpression.all[branchIndex]!,
                 fromQuestionsById,
                 toQuestionsById,
             ),
         );
     }
-    if ('any' in firstExpression && 'any' in secondExpression) {
-        if (firstExpression.any.length !== secondExpression.any.length) {
+    if ('any' in fromExpression && 'any' in toExpression) {
+        if (fromExpression.any.length !== toExpression.any.length) {
             return false;
         }
-        return firstExpression.any.every((branch, branchIndex) =>
+        return fromExpression.any.every((branch, branchIndex) =>
             arePrerequisiteExpressionsEquivalent(
                 branch,
-                secondExpression.any[branchIndex]!,
+                toExpression.any[branchIndex]!,
                 fromQuestionsById,
                 toQuestionsById,
             ),
         );
     }
-    if ('not' in firstExpression && 'not' in secondExpression) {
+    if ('not' in fromExpression && 'not' in toExpression) {
         return arePrerequisiteExpressionsEquivalent(
-            firstExpression.not,
-            secondExpression.not,
+            fromExpression.not,
+            toExpression.not,
             fromQuestionsById,
             toQuestionsById,
         );
