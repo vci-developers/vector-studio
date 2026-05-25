@@ -4,7 +4,6 @@ import type { FormQuestion } from '@/api/form-question/contracts/form-question-s
 import type {
     PrerequisiteOperator,
     PrerequisitePredicate,
-    PrerequisiteValue,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import {
     getDefaultValueForPredicate,
@@ -77,6 +76,28 @@ export default function PrerequisitePredicateRow({
         },
     );
 
+    function revisePredicate(
+        revisedPartialPredicate: Partial<PrerequisitePredicate>,
+    ) {
+        const nextOperator =
+            revisedPartialPredicate.operator ?? predicate.operator;
+        const nextQuestionId =
+            revisedPartialPredicate.questionId ?? predicate.questionId;
+        const nextQuestion = referencableQuestions.find(
+            candidateQuestion => candidateQuestion.id === nextQuestionId,
+        );
+        if (!nextQuestion) return;
+        const nextValue =
+            'value' in revisedPartialPredicate
+                ? revisedPartialPredicate.value
+                : getDefaultValueForPredicate(nextQuestion, nextOperator);
+        onPredicateChange({
+            questionId: nextQuestionId,
+            operator: nextOperator,
+            value: nextValue,
+        });
+    }
+
     function changeReferencedQuestion(nextReferencedQuestionId: number) {
         const nextReferencedQuestion = referencableQuestions.find(
             candidate => candidate.id === nextReferencedQuestionId,
@@ -91,35 +112,9 @@ export default function PrerequisitePredicateRow({
             nextReferencedQuestion.type
         ].find(operator => !usedOperatorsOnNextQuestion.includes(operator));
         if (!firstAvailableOperator) return;
-        onPredicateChange({
+        revisePredicate({
             questionId: nextReferencedQuestion.id,
             operator: firstAvailableOperator,
-            value: getDefaultValueForPredicate(
-                nextReferencedQuestion,
-                firstAvailableOperator,
-            ),
-        });
-    }
-
-    function changeOperator(nextOperator: PrerequisiteOperator) {
-        if (!referencedQuestion) return;
-        onPredicateChange({
-            questionId: predicate.questionId,
-            operator: nextOperator,
-            value: getDefaultValueForPredicate(
-                referencedQuestion,
-                nextOperator,
-            ),
-        });
-    }
-
-    function changePredicateValue(
-        nextPredicateValue: PrerequisiteValue | undefined,
-    ) {
-        onPredicateChange({
-            questionId: predicate.questionId,
-            operator: predicate.operator,
-            value: nextPredicateValue,
         });
     }
 
@@ -148,7 +143,9 @@ export default function PrerequisitePredicateRow({
             <Select
                 value={predicate.operator}
                 onValueChange={nextOperator =>
-                    changeOperator(nextOperator as PrerequisiteOperator)
+                    revisePredicate({
+                        operator: nextOperator as PrerequisiteOperator,
+                    })
                 }
                 disabled={!referencedQuestion}
             >
@@ -168,7 +165,9 @@ export default function PrerequisitePredicateRow({
                     referencedQuestion={referencedQuestion}
                     operator={predicate.operator}
                     predicateValue={predicate.value}
-                    onPredicateValueChange={changePredicateValue}
+                    onPredicateValueChange={nextPredicateValue =>
+                        revisePredicate({ value: nextPredicateValue })
+                    }
                 />
             )}
             <Tooltip>

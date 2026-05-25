@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import PrerequisitePredicateRow from './prerequisite-predicate-row';
 import PrerequisiteComplexRuleSummary from './prerequisite-complex-rule-summary';
+import { walkQuestions } from '@/features/form-builder/utils/walk-questions';
 
 interface PrerequisiteEditorProps {
     draft: Form;
@@ -60,38 +61,14 @@ export default function PrerequisiteEditor({
 
     const excludedQuestionId = questionBeingEdited?.id ?? null;
     const referencableQuestions: FormQuestion[] = [];
-    const visitQuestion = (question: FormQuestion) => {
+    walkQuestions(draft.questions, question => {
         if (question.id !== excludedQuestionId) {
             referencableQuestions.push(question);
         }
-        question.subQuestions?.forEach(visitQuestion);
-    };
-    draft.questions?.forEach(visitQuestion);
+    });
     const hasReferencableQuestions = referencableQuestions.length > 0;
 
-    const canAddMorePredicates = referencableQuestions.some(
-        candidateQuestion => {
-            const usedOperatorsOnCandidate = getOperatorsUsedOnQuestion(
-                predicates,
-                candidateQuestion.id,
-                null,
-            );
-            return OPERATORS_BY_QUESTION_TYPE[candidateQuestion.type].some(
-                operator => !usedOperatorsOnCandidate.includes(operator),
-            );
-        },
-    );
-
-    function emitExpressionChange(
-        nextConnector: 'all' | 'any',
-        nextPredicates: PrerequisitePredicate[],
-    ) {
-        onPrerequisiteExpressionChange(
-            buildPrerequisite(nextConnector, nextPredicates),
-        );
-    }
-
-    function addPredicate() {
+    function findFirstAvailablePredicate() {
         for (const candidateQuestion of referencableQuestions) {
             const usedOperatorsOnCandidate = getOperatorsUsedOnQuestion(
                 predicates,
@@ -102,18 +79,31 @@ export default function PrerequisiteEditor({
                 candidateQuestion.type
             ].find(operator => !usedOperatorsOnCandidate.includes(operator));
             if (firstAvailableOperator) {
-                const newPredicate: PrerequisitePredicate = {
-                    questionId: candidateQuestion.id,
+                return {
+                    question: candidateQuestion,
                     operator: firstAvailableOperator,
-                    value: getDefaultValueForPredicate(
-                        candidateQuestion,
-                        firstAvailableOperator,
-                    ),
                 };
-                emitExpressionChange(connector, [...predicates, newPredicate]);
-                return;
             }
         }
+        return null;
+    }
+
+    const canAddMorePredicates = findFirstAvailablePredicate() !== null;
+
+    function addPredicate() {
+        const availablePredicate = findFirstAvailablePredicate();
+        if (!availablePredicate) return;
+        const newPredicate: PrerequisitePredicate = {
+            questionId: availablePredicate.question.id,
+            operator: availablePredicate.operator,
+            value: getDefaultValueForPredicate(
+                availablePredicate.question,
+                availablePredicate.operator,
+            ),
+        };
+        onPrerequisiteExpressionChange(
+            buildPrerequisite(connector, [...predicates, newPredicate]),
+        );
     }
 
     function updatePredicateAt(
@@ -122,13 +112,17 @@ export default function PrerequisiteEditor({
     ) {
         const nextPredicates = predicates.slice();
         nextPredicates[predicateIndex] = nextPredicate;
-        emitExpressionChange(connector, nextPredicates);
+        onPrerequisiteExpressionChange(
+            buildPrerequisite(connector, nextPredicates),
+        );
     }
 
     function removePredicateAt(predicateIndex: number) {
-        emitExpressionChange(
-            connector,
-            predicates.filter((_, index) => index !== predicateIndex),
+        onPrerequisiteExpressionChange(
+            buildPrerequisite(
+                connector,
+                predicates.filter((_, index) => index !== predicateIndex),
+            ),
         );
     }
 
@@ -166,9 +160,11 @@ export default function PrerequisiteEditor({
                     <Select
                         value={connector}
                         onValueChange={nextConnector =>
-                            emitExpressionChange(
-                                nextConnector as 'all' | 'any',
-                                predicates,
+                            onPrerequisiteExpressionChange(
+                                buildPrerequisite(
+                                    nextConnector as 'all' | 'any',
+                                    predicates,
+                                ),
                             )
                         }
                     >

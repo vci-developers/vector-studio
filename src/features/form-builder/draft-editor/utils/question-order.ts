@@ -1,17 +1,14 @@
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
+import { walkQuestions } from '../../utils/walk-questions';
 
 export function getNextQuestionOrder(draft: Form): number {
     let highestExistingOrder = 0;
-
-    const visitQuestion = (question: FormQuestion) => {
+    walkQuestions(draft.questions, question => {
         if (question.order > highestExistingOrder) {
             highestExistingOrder = question.order;
         }
-        question.subQuestions?.forEach(visitQuestion);
-    };
-
-    draft.questions?.forEach(visitQuestion);
+    });
     return highestExistingOrder + 1;
 }
 

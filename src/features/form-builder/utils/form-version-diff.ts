@@ -7,6 +7,7 @@ import type {
     PrerequisiteValue,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
+import { walkQuestions } from './walk-questions';
 
 export type QuestionDiff = {
     kind: 'unchanged' | 'added' | 'removed' | 'modified';
@@ -33,10 +34,14 @@ const SIMILARITY_THRESHOLD = 5;
 
 export function diffFormVersions(fromForm: Form, toForm: Form) {
     const fromQuestionsById = new Map<number, FormQuestion>();
-    indexQuestionsById(fromForm.questions, fromQuestionsById);
+    walkQuestions(fromForm.questions, question =>
+        fromQuestionsById.set(question.id, question),
+    );
 
     const toQuestionsById = new Map<number, FormQuestion>();
-    indexQuestionsById(toForm.questions, toQuestionsById);
+    walkQuestions(toForm.questions, question =>
+        toQuestionsById.set(question.id, question),
+    );
 
     const diffSummary = { added: 0, removed: 0, modified: 0, unchanged: 0 };
 
@@ -204,17 +209,6 @@ export function diffFormVersions(fromForm: Form, toForm: Form) {
         fromForm.questions,
     );
     return { questionDiffs, summary: diffSummary };
-}
-
-function indexQuestionsById(
-    questions: FormQuestion[] | undefined,
-    questionsByIdAccumulator: Map<number, FormQuestion>,
-): void {
-    if (!questions) return;
-    for (const question of questions) {
-        questionsByIdAccumulator.set(question.id, question);
-        indexQuestionsById(question.subQuestions, questionsByIdAccumulator);
-    }
 }
 
 function computeSimilarityScore(

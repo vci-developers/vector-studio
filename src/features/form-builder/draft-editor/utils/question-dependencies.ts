@@ -1,6 +1,7 @@
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import type { PrerequisiteExpression } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
+import { walkQuestions } from '../../utils/walk-questions';
 
 function prerequisiteExpressionReferencesQuestion(
     expression: PrerequisiteExpression | null,
@@ -31,8 +32,7 @@ function prerequisiteExpressionReferencesQuestion(
 
 export function findDependentQuestions(targetQuestionId: number, draft: Form) {
     const dependentQuestions: FormQuestion[] = [];
-
-    const visitQuestion = (question: FormQuestion) => {
+    walkQuestions(draft.questions, question => {
         if (
             prerequisiteExpressionReferencesQuestion(
                 question.prerequisite,
@@ -41,9 +41,6 @@ export function findDependentQuestions(targetQuestionId: number, draft: Form) {
         ) {
             dependentQuestions.push(question);
         }
-        question.subQuestions?.forEach(visitQuestion);
-    };
-
-    draft.questions?.forEach(visitQuestion);
+    });
     return dependentQuestions;
 }

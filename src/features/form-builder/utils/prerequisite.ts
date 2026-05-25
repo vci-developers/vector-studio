@@ -9,6 +9,7 @@ import type {
     PrerequisiteValue,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
+import { walkQuestions } from './walk-questions';
 
 export const OPERATOR_LABELS: Record<PrerequisiteOperator, string> = {
     eq: 'is',
@@ -124,16 +125,11 @@ function findQuestionById(
     targetQuestionId: number,
     questions: FormQuestion[] | undefined,
 ): FormQuestion | undefined {
-    if (!questions) return undefined;
-    for (const question of questions) {
-        if (question.id === targetQuestionId) return question;
-        const foundQuestion = findQuestionById(
-            targetQuestionId,
-            question.subQuestions,
-        );
-        if (foundQuestion) return foundQuestion;
-    }
-    return undefined;
+    let foundQuestion: FormQuestion | undefined;
+    walkQuestions(questions, question => {
+        if (question.id === targetQuestionId) foundQuestion = question;
+    });
+    return foundQuestion;
 }
 
 function describePrerequisiteValue(

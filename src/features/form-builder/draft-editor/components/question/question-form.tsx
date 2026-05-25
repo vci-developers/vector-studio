@@ -1,9 +1,6 @@
 'use client';
 
-import type {
-    FormQuestion,
-    FormQuestionType,
-} from '@/api/form-question/contracts/form-question-schema';
+import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import { usePostQuestionToDraftForm } from '@/api/form-question/hooks/use-post-question-to-draft-form';
 import { usePutQuestionToDraftForm } from '@/api/form-question/hooks/use-put-question-to-draft-form';
 import type { Form } from '@/api/form/contracts/form-schema';
@@ -16,7 +13,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Fragment } from 'react';
 import { getNextQuestionOrder } from '../../utils/question-order';
 import { toast } from 'sonner';
-import { networkErrorMessage } from '@/lib/network/network-error';
+import {
+    networkErrorMessage,
+    type NetworkError,
+} from '@/lib/network/network-error';
 import {
     Field,
     FieldDescription,
@@ -38,15 +38,8 @@ import { SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import OptionsEditor from './options-editor';
 import PrerequisiteEditor from '../prerequisite/prerequisite-editor';
-
-const QUESTION_TYPE_OPTIONS: Array<{ value: FormQuestionType; label: string }> =
-    [
-        { value: 'text', label: 'Short text' },
-        { value: 'number', label: 'Number' },
-        { value: 'boolean', label: 'Yes / No' },
-        { value: 'select', label: 'Dropdown' },
-        { value: 'date', label: 'Date' },
-    ];
+import { QUESTION_TYPE_LABELS } from '@/features/form-builder/utils/question-type-labels';
+import type { Result } from '@/lib/result/result';
 
 const QUESTION_FORM_ID = 'question-form';
 
@@ -102,10 +95,32 @@ export default function QuestionForm({
         isUpdateQuestionInDraftFormPending;
 
     function onSubmit(values: QuestionFormInput) {
+        const isEditing = questionBeingEdited !== null;
+        const errorTitle = isEditing
+            ? "Couldn't save the question"
+            : "Couldn't add the question";
+        const successMessage = isEditing ? 'Question saved' : 'Question added';
         const normalizedOptions =
             values.type === 'select' ? values.options : null;
 
-        if (questionBeingEdited) {
+        function handleMutationResult(result: Result<unknown, NetworkError>) {
+            if (!result.ok) {
+                toast.error(errorTitle, {
+                    description: networkErrorMessage(result.error),
+                });
+                return;
+            }
+            toast.success(successMessage);
+            onClose();
+        }
+
+        function handleNetworkError() {
+            toast.error(errorTitle, {
+                description: 'A network error occurred. Please try again.',
+            });
+        }
+
+        if (isEditing) {
             updateQuestionInDraftForm(
                 {
                     programId,
@@ -119,22 +134,8 @@ export default function QuestionForm({
                     },
                 },
                 {
-                    onSuccess: result => {
-                        if (!result.ok) {
-                            toast.error("Couldn't save the question", {
-                                description: networkErrorMessage(result.error),
-                            });
-                            return;
-                        }
-                        toast.success('Question saved');
-                        onClose();
-                    },
-                    onError: () => {
-                        toast.error("Couldn't save the question", {
-                            description:
-                                'A network error occurred. Please try again.',
-                        });
-                    },
+                    onSuccess: handleMutationResult,
+                    onError: handleNetworkError,
                 },
             );
             return;
@@ -153,24 +154,7 @@ export default function QuestionForm({
                     prerequisite: values.prerequisite,
                 },
             },
-            {
-                onSuccess: result => {
-                    if (!result.ok) {
-                        toast.error("Couldn't add the question", {
-                            description: networkErrorMessage(result.error),
-                        });
-                        return;
-                    }
-                    toast.success('Question added');
-                    onClose();
-                },
-                onError: () => {
-                    toast.error("Couldn't add the question", {
-                        description:
-                            'A network error occurred. Please try again.',
-                    });
-                },
-            },
+            { onSuccess: handleMutationResult, onError: handleNetworkError },
         );
     }
 
@@ -224,16 +208,16 @@ export default function QuestionForm({
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {QUESTION_TYPE_OPTIONS.map(
-                                                option => (
-                                                    <SelectItem
-                                                        key={option.value}
-                                                        value={option.value}
-                                                    >
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ),
-                                            )}
+                                            {Object.entries(
+                                                QUESTION_TYPE_LABELS,
+                                            ).map(([value, label]) => (
+                                                <SelectItem
+                                                    key={value}
+                                                    value={value}
+                                                >
+                                                    {label}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FieldDescription>

@@ -216,89 +216,167 @@ their source hook or same-feature naming pattern.
 
 ---
 
-## Phase 4 — Consolidate `question-form.tsx` CRUD
+## Phase 4 — Consolidate `question-form.tsx` CRUD ✅ done
 
 [question-form.tsx](../../../src/features/form-builder/draft-editor/components/question/question-form.tsx)
-has two near-identical `mutate()` blocks (lines 108-141 and 143-174)
-with duplicated toast handlers and one differing error/success message.
+had two near-identical `mutate()` blocks with duplicated toast
+handlers and one differing error/success message, plus a local
+`QUESTION_TYPE_OPTIONS` array that duplicated the shared
+`QUESTION_TYPE_LABELS` mapping.
 
-1. **Delete** the local `QUESTION_TYPE_OPTIONS` (lines 42-49). Drive
-   the `<Select>` from `Object.entries(QUESTION_TYPE_LABELS)`. The
-   shared mapping holds the same labels; the local array is dead
-   duplication.
-2. **Collapse** the create/update branches:
-   ```tsx
-   const isEditing = questionBeingEdited !== null;
-   const successMessage = isEditing ? 'Question saved' : 'Question added';
-   const errorTitle = isEditing
-       ? "Couldn't save the question"
-       : "Couldn't add the question";
-   ```
-   The variable shapes for the two `mutate()` calls differ (update
-   takes `questionId`, create takes `parentId` and `order`), so the
-   submit handler keeps a single `if (isEditing) ... else ...` for
-   the variables but a single shared `handleResult(result)` local for
-   the toast callbacks.
-3. **Outer `<Fragment>`** (lines 178/334) wraps two children (`<div>` +
-   `<SheetFooter>`), so it stays.
+**Applied:**
 
-Estimated savings: ~40-50 LOC.
+1. **Dropped** the local `QUESTION_TYPE_OPTIONS`. The `<Select>` now
+   iterates `Object.entries(QUESTION_TYPE_LABELS)` directly. The
+   `FormQuestionType` import was the only consumer of that type in
+   the file and was dropped with it.
+2. **Collapsed** the create/update branches. `onSubmit` now derives
+   `isEditing`, `errorTitle`, `successMessage`, and `normalizedOptions`
+   once at the top, then hoists two shared callbacks
+   (`handleMutationResult`, `handleNetworkError`) that close over
+   them. The differing variable shapes (update needs `questionId`;
+   create needs `parentId` and `order`) keep the `if (isEditing) … else`
+   split, but each branch reuses the same two callback references.
+3. **`handleMutationResult`** is typed `Result<unknown, NetworkError>` —
+   wide enough to satisfy both `usePostQuestionToDraftForm` and
+   `usePutQuestionToDraftForm` via function-parameter contravariance,
+   and avoids naming an intermediate success shape that neither
+   handler reads.
+4. **Outer `<Fragment>`** kept — wraps the form `<div>` plus
+   `<SheetFooter>`.
+
+**Imports tightened:** added `QUESTION_TYPE_LABELS` (absolute path
+per [[feedback-absolute-imports]]), `type NetworkError` alongside
+the existing `networkErrorMessage` value import, and `type Result`
+from `@/lib/result/result`.
+
+**Regression caught during apply:** the first edit dropped the
+`return;` between the update branch and the create call, which
+caused edits to fire both mutations and create a duplicate. Spotted
+during the post-apply read, fixed before the doc was updated.
+
+Savings: ~17 LOC (8 from the dropped array, ~9 net from the
+collapsed mutate blocks once shared imports are counted).
 
 ---
 
-## Phase 5 — Extract `walk-questions.ts`
+## Phase 5 — Extract `walk-questions.ts` ✅ done
 
-The recursive "walk every question" pattern appears in five places:
+The recursive "walk every question" pattern appeared in five places
+across four files. Real reuse, not premature abstraction.
 
-- [question-order.ts:7-10](../../../src/features/form-builder/draft-editor/utils/question-order.ts#L7-L10)
-  (`visitQuestion`)
-- [question-dependencies.ts:35-45](../../../src/features/form-builder/draft-editor/utils/question-dependencies.ts#L35-L45)
-  (`visitQuestion`)
-- [prerequisite.ts:123-137](../../../src/features/form-builder/utils/prerequisite.ts#L123-L137)
-  (`findQuestionById`)
-- [prerequisite-editor.tsx:63-69](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-editor.tsx#L63-L69)
-  (`visitQuestion`)
-- [form-version-diff.ts:209-218](../../../src/features/form-builder/utils/form-version-diff.ts#L209-L218)
-  (`indexQuestionsById`)
+**Applied:**
 
-This is real reuse (five consumers across four files), not premature
-abstraction. The original implementation plan called for a
-`flatten-questions.ts` that was never built.
-
-1. **New util** `src/features/form-builder/utils/walk-questions.ts`:
+1. **New util** [walk-questions.ts](../../../src/features/form-builder/utils/walk-questions.ts) —
+   10 lines including the import. Pre-order traversal, parent before
+   children, `undefined` handled at both top level and `subQuestions`:
    ```ts
    export function walkQuestions(
        questions: FormQuestion[] | undefined,
        visit: (question: FormQuestion) => void,
    ): void
    ```
-2. **Rewrite** the five visitors. Each becomes 2-3 lines instead of 5-10.
+2. **Five consumers rewritten:**
+   - [question-order.ts](../../../src/features/form-builder/draft-editor/utils/question-order.ts) —
+     `getNextQuestionOrder` collapsed to a single `walkQuestions` +
+     max-order accumulator. `findSiblingGroup` left alone (needs
+     sibling-array shape, not per-node walk).
+   - [question-dependencies.ts](../../../src/features/form-builder/draft-editor/utils/question-dependencies.ts) —
+     `findDependentQuestions` collapsed to walk + push-on-match.
+   - [prerequisite.ts](../../../src/features/form-builder/utils/prerequisite.ts) —
+     `findQuestionById` rewritten as walk + captured variable. Loses
+     early-exit, but IDs are unique so the returned node is
+     identical; full-walk cost is negligible at form sizes.
+   - [prerequisite-editor.tsx](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-editor.tsx) —
+     referencable-questions collection collapsed to walk +
+     filter-by-id.
+   - [form-version-diff.ts](../../../src/features/form-builder/utils/form-version-diff.ts) —
+     `indexQuestionsById` **deleted entirely** (one step beyond the
+     plan as originally written). With `walkQuestions` it became a
+     one-liner; the wrapper had nothing left to do. Both call sites
+     in `diffFormVersions` now use `walkQuestions` inline.
 
-Estimated savings: ~20-30 LOC.
+**Import-path consistency note:** the two `draft-editor/utils/` files
+imported `walkQuestions` via relative `../../utils/walk-questions`,
+matching their existing relative-import style. Phase 9 will
+normalize the feature to absolute `@/...` in one sweep.
+
+**Regression caught during apply:** the inserted `walkQuestions`
+block in `prerequisite-editor.tsx` was missing trailing semicolons
+on the `push(question)` statement and the `})` closer — every other
+statement in the file is semicolon-terminated. ESLint did not flag
+it; spotted during the post-apply read and fixed before the doc was
+updated.
+
+Savings: ~25 LOC across the five consumers plus the deleted
+`indexQuestionsById` wrapper.
 
 ---
 
-## Phase 6 — `prerequisite-editor.tsx` & `prerequisite-predicate-row.tsx` readability
+## Phase 6 — `prerequisite-editor.tsx` & `prerequisite-predicate-row.tsx` readability ✅ done
 
-After phase 5,
-[prerequisite-editor.tsx](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-editor.tsx)
-shortens. Remaining cleanups:
+**Applied to [prerequisite-editor.tsx](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-editor.tsx):**
 
-1. **`canAddMorePredicates`** (lines 72-83) and the for-loop inside
-   `addPredicate` (lines 94-117) compute the same "find a question
-   with at least one unused operator" twice with subtly different
-   early-exit. Extract a `pickQuestionWithFreeOperator()` helper that
-   returns `{question, operator} | null`; let `addPredicate`
-   short-circuit on it. `canAddMorePredicates` becomes
-   `pickQuestionWithFreeOperator() !== null`.
-2. **`changeReferencedQuestion`, `changeOperator`,
-   `changePredicateValue`** in
-   [prerequisite-predicate-row.tsx:80-124](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-predicate-row.tsx#L80-L124):
-   three callbacks that all build a new predicate. Extract a single
-   `applyChange(partial: Partial<PrerequisitePredicate>)` helper that
-   handles `getDefaultValueForPredicate` re-derivation in one place.
+1. **Extracted `findFirstAvailablePredicate()`** — returns
+   `{ question, operator } | null` (inlined return shape, no named
+   alias). Replaces the duplicated for-loop that previously appeared
+   in both `canAddMorePredicates` (as `.some(...)`) and `addPredicate`.
+   `canAddMorePredicates` is now a single-line non-null check; the
+   name mirrors the in-file `firstAvailableOperator` /
+   `availableOperators` vocabulary.
+2. **Inlined `emitExpressionChange` at all four call sites** —
+   `addPredicate`, `updatePredicateAt`, `removePredicateAt`, and the
+   connector `<Select>`'s `onValueChange`. The wrapper was pure
+   composition (`buildPrerequisite` → `onPrerequisiteExpressionChange`)
+   and added a "what does this name do?" hop without abstracting
+   real logic. `updatePredicateAt` and `removePredicateAt` stay
+   named — each contains real array manipulation (slice+assign,
+   filter), not a thin wrapper.
 
-Estimated savings: ~30-40 LOC across the two files.
+**Applied to [prerequisite-predicate-row.tsx](../../../src/features/form-builder/draft-editor/components/prerequisite/prerequisite-predicate-row.tsx):**
+
+1. **Extracted `revisePredicate(partial)`** — single helper that
+   absorbs the value-rederivation rule. The `'value' in partial`
+   key-presence check is load-bearing (it distinguishes "caller
+   didn't pass value" from "caller passed `value: undefined`", which
+   matters because `empty` / `not_empty` operators legitimately
+   produce `value: undefined`). Naming chosen for the verb's
+   "partial change" connotation, plain English over jargon like
+   `patch`, and to read distinctly from the `onPredicateChange` prop
+   it calls.
+2. **Kept `changeReferencedQuestion`** — has real multi-step logic
+   (find next question → fetch used operators → pick first available →
+   emit) worth naming.
+3. **Inlined `changeOperator` and `changePredicateValue` at their JSX
+   call sites** — both were one-line passthroughs to
+   `revisePredicate({ ... })` whose names added nothing beyond what
+   the inlined call shows. The original `if (!referencedQuestion)
+   return;` guard in `changeOperator` folds correctly into
+   `revisePredicate`'s `if (!nextQuestion) return;`.
+
+**Principle reinforced during this phase:** prefer fewer utilities
+over fewer lines. A thin wrapper that only renames an existing
+composition (e.g. `emitExpressionChange`, `changeOperator`,
+`changePredicateValue`) costs the reader a name lookup without
+hiding real complexity, so it loses to the inlined call. Helpers
+earn their keep when they consolidate non-trivial logic
+(`findFirstAvailablePredicate`, `revisePredicate`,
+`changeReferencedQuestion`) or non-trivial state shaping
+(`updatePredicateAt`, `removePredicateAt`).
+
+**Regressions caught during apply:**
+
+- `availablPredicate` typo (missing `e`) at five sites in
+  `addPredicate` — spotted on read-back, fixed before the
+  `emitExpressionChange` inlining proceeded.
+- `changeOperator` / `changePredicateValue` deleted from the row
+  component without inlining their JSX call sites, leaving two
+  `TS2304: Cannot find name` errors. Caught by `tsc --noEmit`,
+  fixed by inlining the two arrows.
+
+Savings: ~25 LOC across the two files; net handler count drops
+from four (editor) + three (row) to three + two, with the
+remaining ones each carrying real logic.
 
 ---
 
