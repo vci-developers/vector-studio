@@ -46,6 +46,7 @@ export const prerequisiteExpressionSchema = z.union([
 export type PrerequisiteOperator = z.infer<typeof prerequisiteOperatorSchema>;
 export type PrerequisiteValue = z.infer<typeof prerequisiteValueSchema>;
 export type PrerequisitePredicate = z.infer<typeof prerequisitePredicateSchema>;
+export type PrerequisiteGroupConnector = 'all' | 'any';
 export type PrerequisiteExpression = z.infer<
     typeof prerequisiteExpressionSchema
 >;

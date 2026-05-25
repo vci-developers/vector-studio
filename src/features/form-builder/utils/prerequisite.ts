@@ -4,14 +4,13 @@ import type {
 } from '@/api/form-question/contracts/form-question-schema';
 import type {
     PrerequisiteExpression,
+    PrerequisiteGroupConnector,
     PrerequisiteOperator,
     PrerequisitePredicate,
     PrerequisiteValue,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from './walk-questions';
-
-export type PrerequisiteGroupConnector = 'all' | 'any';
 
 export const PREREQUISITE_OPERATOR_LABELS: Record<
     PrerequisiteOperator,

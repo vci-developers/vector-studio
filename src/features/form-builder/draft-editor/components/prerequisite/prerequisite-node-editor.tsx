@@ -3,6 +3,7 @@
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 import type {
     PrerequisiteExpression,
+    PrerequisiteGroupConnector,
     PrerequisitePredicate,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import {
@@ -10,7 +11,6 @@ import {
     getPrerequisiteGroupParts,
     findFirstAvailablePredicate,
     PREREQUISITE_GROUP_CONNECTOR_LABELS,
-    type PrerequisiteGroupConnector,
 } from '@/features/form-builder/utils/prerequisite';
 import { Button } from '@/components/ui/button';
 import {
