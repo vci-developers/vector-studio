@@ -12,6 +12,9 @@ import type {
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from './walk-questions';
 
+// ── Look-up tables ────────────────────────────────────────────────────────────
+
+/** Natural-language labels for operator tokens, shown in the predicate-row dropdown. */
 export const PREREQUISITE_OPERATOR_LABELS: Record<
     PrerequisiteOperator,
     string
@@ -30,6 +33,7 @@ export const PREREQUISITE_OPERATOR_LABELS: Record<
     not_empty: 'has been answered',
 };
 
+/** Natural-language labels for group connectors, shown in the connector dropdown. */
 export const PREREQUISITE_GROUP_CONNECTOR_LABELS: Record<
     PrerequisiteGroupConnector,
     string
@@ -38,6 +42,7 @@ export const PREREQUISITE_GROUP_CONNECTOR_LABELS: Record<
     any: 'ANY of these match',
 };
 
+/** Allowed operators per question type, used to filter the operator dropdown. */
 export const PREREQUISITE_OPERATORS_BY_QUESTION_TYPE: Record<
     FormQuestionType,
     PrerequisiteOperator[]
@@ -49,6 +54,9 @@ export const PREREQUISITE_OPERATORS_BY_QUESTION_TYPE: Record<
     date: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'],
 };
 
+// ── Group expression ──────────────────────────────────────────────────────────
+
+/** Unwraps an all/any group node into { connector, childExpressions }; null for predicate nodes. */
 export function getPrerequisiteGroupParts(
     prerequisiteExpression: PrerequisiteExpression,
 ): {
@@ -70,6 +78,7 @@ export function getPrerequisiteGroupParts(
     return null;
 }
 
+/** Builds an all/any group node from connector and children; null for an empty children list. */
 export function buildPrerequisiteGroup(
     connector: PrerequisiteGroupConnector,
     childExpressions: PrerequisiteExpression[],
@@ -80,6 +89,9 @@ export function buildPrerequisiteGroup(
         : { any: childExpressions };
 }
 
+// ── Expression normalization ──────────────────────────────────────────────────
+
+/** Prunes null children and unwraps single-child groups; null for a null or fully-pruned input. */
 export function simplifyPrerequisiteExpression(
     prerequisiteExpression: PrerequisiteExpression | null,
 ): PrerequisiteExpression | null {
@@ -102,6 +114,9 @@ export function simplifyPrerequisiteExpression(
     );
 }
 
+// ── Predicate defaults & availability ────────────────────────────────────────
+
+/** Returns the initial value for a new predicate given the question type and operator. */
 export function getDefaultPredicateValue(
     referencedQuestion: FormQuestion,
     operator: PrerequisiteOperator,
@@ -122,6 +137,7 @@ export function getDefaultPredicateValue(
     }
 }
 
+/** Returns operators already claimed by siblingPredicates for targetQuestionId. */
 export function getOperatorsAlreadyUsedOnQuestion(
     siblingPredicates: PrerequisitePredicate[],
     targetQuestionId: number,
@@ -131,6 +147,7 @@ export function getOperatorsAlreadyUsedOnQuestion(
         .map(predicate => predicate.operator);
 }
 
+/** Finds the first predicate that can be added without duplicating a sibling's operator; null if none available. */
 export function findFirstAvailablePredicate(
     candidateQuestions: FormQuestion[],
     existingSiblingPredicates: PrerequisitePredicate[],
@@ -158,6 +175,9 @@ export function findFirstAvailablePredicate(
     return null;
 }
 
+// ── Natural-language preview ──────────────────────────────────────────────────
+
+/** Finds a question by id anywhere in the tree; undefined if not found. */
 function findQuestionByIdInTree(
     targetQuestionId: number,
     questionTree: FormQuestion[] | undefined,
@@ -169,6 +189,7 @@ function findQuestionByIdInTree(
     return foundQuestion;
 }
 
+/** Formats a predicate value for display in the preview sentence. */
 function describePrerequisiteValue(
     predicateValue: PrerequisiteValue | undefined,
 ): string {
@@ -180,6 +201,7 @@ function describePrerequisiteValue(
     return `"${predicateValue}"`;
 }
 
+/** Recursively renders a prerequisite expression as natural language. */
 function describePrerequisiteExpression(
     prerequisiteExpression: PrerequisiteExpression,
     draft: Form,
@@ -220,6 +242,7 @@ function describePrerequisiteExpression(
     );
 }
 
+/** Returns a natural-language description of prerequisiteExpression, or null if there is none. */
 export function describePrerequisite(
     prerequisiteExpression: PrerequisiteExpression | null,
     draft: Form,

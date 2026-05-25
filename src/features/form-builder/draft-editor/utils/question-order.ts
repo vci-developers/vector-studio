@@ -2,6 +2,9 @@ import type { FormQuestion } from '@/api/form-question/contracts/form-question-s
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from '../../utils/walk-questions';
 
+// ── Next order ────────────────────────────────────────────────────────────────
+
+/** Returns max(order) + 1 across all questions in draft. */
 export function getNextQuestionOrder(draft: Form): number {
     let highestExistingOrder = 0;
     walkQuestions(draft.questions, question => {
@@ -12,6 +15,9 @@ export function getNextQuestionOrder(draft: Form): number {
     return highestExistingOrder + 1;
 }
 
+// ── Sibling group lookup ──────────────────────────────────────────────────────
+
+/** Returns the list of same-level siblings that contains targetQuestionId, searching recursively; null if not found. */
 function findSiblingGroup(
     targetQuestionId: number,
     candidateSiblingGroup: FormQuestion[] | undefined,
@@ -32,6 +38,9 @@ function findSiblingGroup(
     return null;
 }
 
+// ── Adjacent swap ─────────────────────────────────────────────────────────────
+
+/** Returns the two { id, order } updates needed to swap questionToMoveId with its adjacent sibling. */
 export function swapAdjacentSiblings(
     questionToMoveId: number,
     direction: 'up' | 'down',

@@ -1,5 +1,8 @@
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
 
+// ── Question similarity ───────────────────────────────────────────────────────
+
+/** Scores how similar two questions from different versions are; minimum score for a match is 5. */
 export function computeSimilarityScore(
     fromQuestion: FormQuestion,
     toQuestion: FormQuestion,
@@ -32,6 +35,9 @@ export function computeSimilarityScore(
     return score;
 }
 
+// ── Label similarity — Dice coefficient ──────────────────────────────────────
+
+/** Dice coefficient [0–1] between two strings via character bigrams. */
 function computeDiceCoefficient(
     firstLabel: string,
     secondLabel: string,
@@ -49,6 +55,7 @@ function computeDiceCoefficient(
     );
 }
 
+/** Returns the set of all two-character substrings in label. */
 function collectCharacterBigrams(label: string): Set<string> {
     const bigrams = new Set<string>();
     for (
@@ -61,6 +68,9 @@ function collectCharacterBigrams(label: string): Set<string> {
     return bigrams;
 }
 
+// ── Option similarity — Jaccard index ────────────────────────────────────────
+
+/** Jaccard index [0–1] between two option lists treated as sets. */
 function computeJaccardSimilarity(
     firstOptions: string[],
     secondOptions: string[],

@@ -3,6 +3,9 @@ import type { PrerequisiteExpression } from '@/api/form-question/contracts/prere
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from '../../utils/walk-questions';
 
+// ── Prerequisite reference check ──────────────────────────────────────────────
+
+/** Returns true if any predicate in expression (recursively) references targetQuestionId. */
 function prerequisiteExpressionReferencesQuestion(
     expression: PrerequisiteExpression | null,
     targetQuestionId: number,
@@ -24,6 +27,9 @@ function prerequisiteExpressionReferencesQuestion(
     return false;
 }
 
+// ── Dependent question lookup ─────────────────────────────────────────────────
+
+/** Returns every question in draft whose prerequisite references targetQuestionId. */
 export function findDependentQuestions(targetQuestionId: number, draft: Form) {
     const dependentQuestions: FormQuestion[] = [];
     walkQuestions(draft.questions, question => {

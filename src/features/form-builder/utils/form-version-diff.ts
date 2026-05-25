@@ -10,6 +10,8 @@ import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from './walk-questions';
 import { computeSimilarityScore } from './question-diff-similarity';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 export type QuestionDiff = {
     kind: 'unchanged' | 'added' | 'removed' | 'modified';
     fromQuestion: FormQuestion | null;
@@ -31,8 +33,12 @@ export type QuestionDiff = {
     children: QuestionDiff[];
 };
 
+// ── Entry point ───────────────────────────────────────────────────────────────
+
+/** Minimum score for a from/to question pair to be considered a match. */
 const SIMILARITY_THRESHOLD = 5;
 
+/** Diffs two form versions using greedy similarity matching; returns per-question diffs and a summary count. */
 export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
     const fromQuestionsById = new Map<number, FormQuestion>();
     walkQuestions(fromForm.questions, question =>
@@ -46,6 +52,7 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
 
     const diffSummary = { added: 0, removed: 0, modified: 0, unchanged: 0 };
 
+    /** Marks addedQuestion and all its descendants as added. */
     function buildAddedSubtree(addedQuestion: FormQuestion): QuestionDiff {
         diffSummary.added++;
         return {
@@ -59,6 +66,7 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
         };
     }
 
+    /** Marks removedQuestion and all its descendants as removed. */
     function buildRemovedSubtree(removedQuestion: FormQuestion): QuestionDiff {
         diffSummary.removed++;
         return {
@@ -72,6 +80,7 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
         };
     }
 
+    /** Greedily matches from/to siblings by similarity score, then classifies each pair as added/removed/modified/unchanged. */
     function buildSiblingDiffs(
         fromSiblings: FormQuestion[] | undefined,
         toSiblings: FormQuestion[] | undefined,
@@ -178,10 +187,16 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
     return { questionDiffs, summary: diffSummary };
 }
 
+// ── Sort utility ──────────────────────────────────────────────────────────────
+
+/** Returns a sorted copy of questions by ascending order; [] for undefined. */
 function sortByOrder(questions: FormQuestion[] | undefined): FormQuestion[] {
     return (questions ?? []).slice().sort((a, b) => a.order - b.order);
 }
 
+// ── Field-level diffing ───────────────────────────────────────────────────────
+
+/** Returns the set of field-level changes between two matched questions; empty object if unchanged. */
 function computeFieldChanges(
     fromQuestion: FormQuestion,
     toQuestion: FormQuestion,
@@ -258,6 +273,7 @@ function computeFieldChanges(
     return fieldChanges;
 }
 
+/** Resolves parentQuestionId to { id, label } for display; null for root questions. */
 function resolveParentSummary(
     parentQuestionId: number | null,
     questionsById: Map<number, FormQuestion>,
@@ -267,6 +283,7 @@ function resolveParentSummary(
     return { id: parentQuestionId, label: parentQuestion.label };
 }
 
+/** Returns true if both IDs resolve (in their respective maps) to questions with the same label. */
 function areQuestionReferencesLabelEquivalent(
     fromReferencedQuestionId: number | null,
     toReferencedQuestionId: number | null,
@@ -286,6 +303,9 @@ function areQuestionReferencesLabelEquivalent(
     return fromReferencedQuestion.label === toReferencedQuestion.label;
 }
 
+// ── Prerequisite equivalence ──────────────────────────────────────────────────
+
+/** Returns true if two prerequisite expressions are structurally equivalent under label-based question matching. */
 function arePrerequisiteExpressionsEquivalent(
     fromExpression: PrerequisiteExpression | null,
     toExpression: PrerequisiteExpression | null,
@@ -342,6 +362,7 @@ function arePrerequisiteExpressionsEquivalent(
     return false;
 }
 
+/** Returns true if two predicate values are equal; compares arrays element-by-element. */
 function arePrerequisiteValuesEqual(
     firstValue: PrerequisiteValue | undefined,
     secondValue: PrerequisiteValue | undefined,
