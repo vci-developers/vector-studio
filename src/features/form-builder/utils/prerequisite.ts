@@ -11,7 +11,12 @@ import type {
 import type { Form } from '@/api/form/contracts/form-schema';
 import { walkQuestions } from './walk-questions';
 
-export const OPERATOR_LABELS: Record<PrerequisiteOperator, string> = {
+export type PrerequisiteGroupConnector = 'all' | 'any';
+
+export const PREREQUISITE_OPERATOR_LABELS: Record<
+    PrerequisiteOperator,
+    string
+> = {
     eq: 'is',
     neq: 'is not',
     gt: 'is greater than',
@@ -26,7 +31,15 @@ export const OPERATOR_LABELS: Record<PrerequisiteOperator, string> = {
     not_empty: 'has been answered',
 };
 
-export const OPERATORS_BY_QUESTION_TYPE: Record<
+export const PREREQUISITE_GROUP_CONNECTOR_LABELS: Record<
+    PrerequisiteGroupConnector,
+    string
+> = {
+    all: 'ALL of these match',
+    any: 'ANY of these match',
+};
+
+export const PREREQUISITE_OPERATORS_BY_QUESTION_TYPE: Record<
     FormQuestionType,
     PrerequisiteOperator[]
 > = {
@@ -37,57 +50,60 @@ export const OPERATORS_BY_QUESTION_TYPE: Record<
     date: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty'],
 };
 
-export function isPrerequisiteEditable(
-    expression: PrerequisiteExpression | null,
-): boolean {
-    if (!expression) return true;
-    if ('questionId' in expression) return true;
-    if ('not' in expression) return false;
-    if ('all' in expression) {
-        return expression.all.every(branch => 'questionId' in branch);
+export function getPrerequisiteGroupParts(
+    prerequisiteExpression: PrerequisiteExpression,
+): {
+    connector: PrerequisiteGroupConnector;
+    childExpressions: PrerequisiteExpression[];
+} | null {
+    if ('all' in prerequisiteExpression) {
+        return {
+            connector: 'all',
+            childExpressions: prerequisiteExpression.all,
+        };
     }
-    if ('any' in expression) {
-        return expression.any.every(branch => 'questionId' in branch);
+    if ('any' in prerequisiteExpression) {
+        return {
+            connector: 'any',
+            childExpressions: prerequisiteExpression.any,
+        };
     }
-    return false;
+    return null;
 }
 
-export function getPrerequisiteConnector(
-    expression: PrerequisiteExpression | null,
-): 'all' | 'any' {
-    if (expression && 'any' in expression) return 'any';
-    return 'all';
-}
-
-export function getPrerequisitePredicates(
-    expression: PrerequisiteExpression | null,
-): PrerequisitePredicate[] {
-    if (!expression) return [];
-    if ('questionId' in expression) return [expression];
-    if ('all' in expression) {
-        return expression.all.filter(
-            (branch): branch is PrerequisitePredicate => 'questionId' in branch,
-        );
-    }
-    if ('any' in expression) {
-        return expression.any.filter(
-            (branch): branch is PrerequisitePredicate => 'questionId' in branch,
-        );
-    }
-    return [];
-}
-
-export function buildPrerequisite(
-    connector: 'all' | 'any',
-    predicates: PrerequisitePredicate[],
+export function buildPrerequisiteGroup(
+    connector: PrerequisiteGroupConnector,
+    childExpressions: PrerequisiteExpression[],
 ): PrerequisiteExpression | null {
-    const [firstPredicate, ...remainingPredicates] = predicates;
-    if (!firstPredicate) return null;
-    if (remainingPredicates.length === 0) return firstPredicate;
-    return connector === 'all' ? { all: predicates } : { any: predicates };
+    if (childExpressions.length === 0) return null;
+    return connector === 'all'
+        ? { all: childExpressions }
+        : { any: childExpressions };
 }
 
-export function getDefaultValueForPredicate(
+export function simplifyPrerequisiteExpression(
+    prerequisiteExpression: PrerequisiteExpression | null,
+): PrerequisiteExpression | null {
+    if (!prerequisiteExpression) return null;
+    if ('questionId' in prerequisiteExpression) return prerequisiteExpression;
+    const groupParts = getPrerequisiteGroupParts(prerequisiteExpression);
+    if (!groupParts) return null;
+    const simplifiedChildExpressions = groupParts.childExpressions
+        .map(childExpression => simplifyPrerequisiteExpression(childExpression))
+        .filter(
+            (childExpression): childExpression is PrerequisiteExpression =>
+                childExpression !== null,
+        );
+    if (simplifiedChildExpressions.length === 0) return null;
+    if (simplifiedChildExpressions.length === 1)
+        return simplifiedChildExpressions[0]!;
+    return buildPrerequisiteGroup(
+        groupParts.connector,
+        simplifiedChildExpressions,
+    );
+}
+
+export function getDefaultPredicateValue(
     referencedQuestion: FormQuestion,
     operator: PrerequisiteOperator,
 ): PrerequisiteValue | undefined {
@@ -107,81 +123,108 @@ export function getDefaultValueForPredicate(
     }
 }
 
-export function getOperatorsUsedOnQuestion(
-    predicates: PrerequisitePredicate[],
+export function getOperatorsAlreadyUsedOnQuestion(
+    siblingPredicates: PrerequisitePredicate[],
     targetQuestionId: number,
-    excludingPredicateIndex: number | null,
 ): PrerequisiteOperator[] {
-    return predicates
-        .filter(
-            (predicate, predicateIndex) =>
-                predicateIndex !== excludingPredicateIndex &&
-                predicate.questionId === targetQuestionId,
-        )
+    return siblingPredicates
+        .filter(predicate => predicate.questionId === targetQuestionId)
         .map(predicate => predicate.operator);
 }
 
-function findQuestionById(
+export function findFirstAvailablePredicate(
+    candidateQuestions: FormQuestion[],
+    existingSiblingPredicates: PrerequisitePredicate[],
+): PrerequisitePredicate | null {
+    for (const candidateQuestion of candidateQuestions) {
+        const operatorsAlreadyUsedOnCandidate =
+            getOperatorsAlreadyUsedOnQuestion(
+                existingSiblingPredicates,
+                candidateQuestion.id,
+            );
+        const firstAvailableOperator = PREREQUISITE_OPERATORS_BY_QUESTION_TYPE[
+            candidateQuestion.type
+        ].find(operator => !operatorsAlreadyUsedOnCandidate.includes(operator));
+        if (firstAvailableOperator) {
+            return {
+                questionId: candidateQuestion.id,
+                operator: firstAvailableOperator,
+                value: getDefaultPredicateValue(
+                    candidateQuestion,
+                    firstAvailableOperator,
+                ),
+            };
+        }
+    }
+    return null;
+}
+
+function findQuestionByIdInTree(
     targetQuestionId: number,
-    questions: FormQuestion[] | undefined,
+    questionTree: FormQuestion[] | undefined,
 ): FormQuestion | undefined {
     let foundQuestion: FormQuestion | undefined;
-    walkQuestions(questions, question => {
+    walkQuestions(questionTree, question => {
         if (question.id === targetQuestionId) foundQuestion = question;
     });
     return foundQuestion;
 }
 
 function describePrerequisiteValue(
-    value: PrerequisiteValue | undefined,
+    predicateValue: PrerequisiteValue | undefined,
 ): string {
-    if (value == null) return '(no value)';
-    if (Array.isArray(value)) return `(${value.join(', ')})`;
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (typeof value === 'number') return String(value);
-    return `"${value}"`;
+    if (predicateValue == null) return '(no value)';
+    if (Array.isArray(predicateValue)) return `(${predicateValue.join(', ')})`;
+    if (typeof predicateValue === 'boolean')
+        return predicateValue ? 'Yes' : 'No';
+    if (typeof predicateValue === 'number') return String(predicateValue);
+    return `"${predicateValue}"`;
 }
 
-function describeExpression(
-    expression: PrerequisiteExpression,
+function describePrerequisiteExpression(
+    prerequisiteExpression: PrerequisiteExpression,
     draft: Form,
 ): string {
-    if ('questionId' in expression) {
-        const referencedQuestion = findQuestionById(
-            expression.questionId,
+    if ('questionId' in prerequisiteExpression) {
+        const referencedQuestion = findQuestionByIdInTree(
+            prerequisiteExpression.questionId,
             draft.questions,
         );
         const referencedQuestionLabel =
-            referencedQuestion?.label ?? `Question ${expression.questionId}`;
-        const operatorLabel = OPERATOR_LABELS[expression.operator];
+            referencedQuestion?.label ??
+            `Question ${prerequisiteExpression.questionId}`;
+        const operatorLabel =
+            PREREQUISITE_OPERATOR_LABELS[prerequisiteExpression.operator];
         if (
-            expression.operator === 'empty' ||
-            expression.operator === 'not_empty'
+            prerequisiteExpression.operator === 'empty' ||
+            prerequisiteExpression.operator === 'not_empty'
         ) {
             return `"${referencedQuestionLabel}" ${operatorLabel}`;
         }
-        return `"${referencedQuestionLabel}" ${operatorLabel} ${describePrerequisiteValue(expression.value)}`;
+        return `"${referencedQuestionLabel}" ${operatorLabel} ${describePrerequisiteValue(prerequisiteExpression.value)}`;
     }
-    if ('all' in expression) {
-        return expression.all
-            .map(branch => describeExpression(branch, draft))
-            .join(' AND ');
-    }
-    if ('any' in expression) {
-        return expression.any
-            .map(branch => describeExpression(branch, draft))
-            .join(' OR ');
-    }
-    if ('not' in expression) {
-        return `NOT (${describeExpression(expression.not, draft)})`;
-    }
-    return '';
+    const groupParts = getPrerequisiteGroupParts(prerequisiteExpression);
+    if (!groupParts) return '';
+    const childDescriptions = groupParts.childExpressions.map(
+        childExpression => {
+            const childDescription = describePrerequisiteExpression(
+                childExpression,
+                draft,
+            );
+            return 'questionId' in childExpression
+                ? childDescription
+                : `(${childDescription})`;
+        },
+    );
+    return childDescriptions.join(
+        groupParts.connector === 'all' ? ' AND ' : ' OR ',
+    );
 }
 
 export function describePrerequisite(
-    expression: PrerequisiteExpression | null,
+    prerequisiteExpression: PrerequisiteExpression | null,
     draft: Form,
 ): string | null {
-    if (!expression) return null;
-    return describeExpression(expression, draft);
+    if (!prerequisiteExpression) return null;
+    return describePrerequisiteExpression(prerequisiteExpression, draft);
 }

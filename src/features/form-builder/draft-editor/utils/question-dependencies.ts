@@ -21,12 +21,6 @@ function prerequisiteExpressionReferencesQuestion(
             prerequisiteExpressionReferencesQuestion(branch, targetQuestionId),
         );
     }
-    if ('not' in expression) {
-        return prerequisiteExpressionReferencesQuestion(
-            expression.not,
-            targetQuestionId,
-        );
-    }
     return false;
 }
 

@@ -339,14 +339,6 @@ function arePrerequisiteExpressionsEquivalent(
             ),
         );
     }
-    if ('not' in fromExpression && 'not' in toExpression) {
-        return arePrerequisiteExpressionsEquivalent(
-            fromExpression.not,
-            toExpression.not,
-            fromQuestionsById,
-            toQuestionsById,
-        );
-    }
     return false;
 }
 

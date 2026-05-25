@@ -1,33 +1,17 @@
 'use client';
 
 import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
-import type {
-    PrerequisiteExpression,
-    PrerequisitePredicate,
-} from '@/api/form-question/contracts/prerequisite-expression-schema';
+import type { PrerequisiteExpression } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 import {
-    buildPrerequisite,
+    buildPrerequisiteGroup,
     describePrerequisite,
-    getDefaultValueForPredicate,
-    getOperatorsUsedOnQuestion,
-    getPrerequisiteConnector,
-    getPrerequisitePredicates,
-    isPrerequisiteEditable,
-    OPERATORS_BY_QUESTION_TYPE,
-} from '../../../utils/prerequisite';
+    findFirstAvailablePredicate,
+} from '@/features/form-builder/utils/prerequisite';
+import { walkQuestions } from '@/features/form-builder/utils/walk-questions';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import PrerequisitePredicateRow from './prerequisite-predicate-row';
-import PrerequisiteComplexRuleSummary from './prerequisite-complex-rule-summary';
-import { walkQuestions } from '@/features/form-builder/utils/walk-questions';
+import PrerequisiteNodeEditor from './prerequisite-node-editor';
 
 interface PrerequisiteEditorProps {
     draft: Form;
@@ -44,21 +28,6 @@ export default function PrerequisiteEditor({
     prerequisiteExpression,
     onPrerequisiteExpressionChange,
 }: PrerequisiteEditorProps) {
-    if (
-        prerequisiteExpression &&
-        !isPrerequisiteEditable(prerequisiteExpression)
-    ) {
-        return (
-            <PrerequisiteComplexRuleSummary
-                prerequisiteExpression={prerequisiteExpression}
-                draft={draft}
-            />
-        );
-    }
-
-    const connector = getPrerequisiteConnector(prerequisiteExpression);
-    const predicates = getPrerequisitePredicates(prerequisiteExpression);
-
     const excludedQuestionId = questionBeingEdited?.id ?? null;
     const referencableQuestions: FormQuestion[] = [];
     walkQuestions(draft.questions, question => {
@@ -68,65 +37,15 @@ export default function PrerequisiteEditor({
     });
     const hasReferencableQuestions = referencableQuestions.length > 0;
 
-    function findFirstAvailablePredicate() {
-        for (const candidateQuestion of referencableQuestions) {
-            const usedOperatorsOnCandidate = getOperatorsUsedOnQuestion(
-                predicates,
-                candidateQuestion.id,
-                null,
+    if (!prerequisiteExpression) {
+        const addFirstCondition = () => {
+            const firstPredicate = findFirstAvailablePredicate(
+                referencableQuestions,
+                [],
             );
-            const firstAvailableOperator = OPERATORS_BY_QUESTION_TYPE[
-                candidateQuestion.type
-            ].find(operator => !usedOperatorsOnCandidate.includes(operator));
-            if (firstAvailableOperator) {
-                return {
-                    question: candidateQuestion,
-                    operator: firstAvailableOperator,
-                };
-            }
-        }
-        return null;
-    }
-
-    const canAddMorePredicates = findFirstAvailablePredicate() !== null;
-
-    function addPredicate() {
-        const availablePredicate = findFirstAvailablePredicate();
-        if (!availablePredicate) return;
-        const newPredicate: PrerequisitePredicate = {
-            questionId: availablePredicate.question.id,
-            operator: availablePredicate.operator,
-            value: getDefaultValueForPredicate(
-                availablePredicate.question,
-                availablePredicate.operator,
-            ),
+            if (!firstPredicate) return;
+            onPrerequisiteExpressionChange(firstPredicate);
         };
-        onPrerequisiteExpressionChange(
-            buildPrerequisite(connector, [...predicates, newPredicate]),
-        );
-    }
-
-    function updatePredicateAt(
-        predicateIndex: number,
-        nextPredicate: PrerequisitePredicate,
-    ) {
-        const nextPredicates = predicates.slice();
-        nextPredicates[predicateIndex] = nextPredicate;
-        onPrerequisiteExpressionChange(
-            buildPrerequisite(connector, nextPredicates),
-        );
-    }
-
-    function removePredicateAt(predicateIndex: number) {
-        onPrerequisiteExpressionChange(
-            buildPrerequisite(
-                connector,
-                predicates.filter((_, index) => index !== predicateIndex),
-            ),
-        );
-    }
-
-    if (predicates.length === 0) {
         return (
             <div className="border-border bg-muted/30 space-y-3 rounded-md border p-3">
                 <p className="text-muted-foreground text-sm">
@@ -138,8 +57,8 @@ export default function PrerequisiteEditor({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={addPredicate}
-                    disabled={!canAddMorePredicates}
+                    onClick={addFirstCondition}
+                    disabled={!hasReferencableQuestions}
                 >
                     <Plus />
                     Add condition
@@ -150,68 +69,106 @@ export default function PrerequisiteEditor({
 
     const previewSentence = describePrerequisite(prerequisiteExpression, draft);
 
-    return (
-        <div className="border-border bg-muted/30 space-y-3 rounded-md border p-3">
-            {predicates.length >= 2 && (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground text-sm">
-                        Show when
-                    </span>
-                    <Select
-                        value={connector}
-                        onValueChange={nextConnector =>
-                            onPrerequisiteExpressionChange(
-                                buildPrerequisite(
-                                    nextConnector as 'all' | 'any',
-                                    predicates,
-                                ),
-                            )
+    if ('questionId' in prerequisiteExpression) {
+        const currentRootPredicate = prerequisiteExpression;
+
+        const addSiblingPredicate = () => {
+            const newSiblingPredicate = findFirstAvailablePredicate(
+                referencableQuestions,
+                [currentRootPredicate],
+            );
+            if (!newSiblingPredicate) return;
+            onPrerequisiteExpressionChange(
+                buildPrerequisiteGroup('all', [
+                    currentRootPredicate,
+                    newSiblingPredicate,
+                ]),
+            );
+        };
+
+        const addSiblingSubGroup = () => {
+            const firstPredicateInNewSubGroup = findFirstAvailablePredicate(
+                referencableQuestions,
+                [],
+            );
+            if (!firstPredicateInNewSubGroup) return;
+            const newSubGroup = buildPrerequisiteGroup('all', [
+                firstPredicateInNewSubGroup,
+            ]);
+            if (!newSubGroup) return;
+            onPrerequisiteExpressionChange(
+                buildPrerequisiteGroup('all', [
+                    currentRootPredicate,
+                    newSubGroup,
+                ]),
+            );
+        };
+
+        const canAddSiblingPredicate =
+            findFirstAvailablePredicate(referencableQuestions, [
+                currentRootPredicate,
+            ]) !== null;
+
+        return (
+            <div className="space-y-3">
+                <div className="border-border bg-muted/30 space-y-3 rounded-md border p-3">
+                    <PrerequisiteNodeEditor
+                        nodeExpression={currentRootPredicate}
+                        referencableQuestions={referencableQuestions}
+                        otherSiblingPredicates={[]}
+                        onNodeExpressionChange={onPrerequisiteExpressionChange}
+                        onRemoveNode={() =>
+                            onPrerequisiteExpressionChange(null)
                         }
-                    >
-                        <SelectTrigger size="sm" className="min-w-48">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">
-                                all conditions match
-                            </SelectItem>
-                            <SelectItem value="any">
-                                any condition matches
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
+                        canRemoveNode={false}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addSiblingPredicate}
+                            disabled={!canAddSiblingPredicate}
+                        >
+                            <Plus />
+                            Add condition
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={addSiblingSubGroup}
+                            disabled={!hasReferencableQuestions}
+                        >
+                            <Plus />
+                            Add group
+                        </Button>
+                    </div>
                 </div>
-            )}
-            <ul className="space-y-2">
-                {predicates.map((predicate, predicateIndex) => (
-                    <li key={predicateIndex}>
-                        <PrerequisitePredicateRow
-                            predicate={predicate}
-                            predicateIndex={predicateIndex}
-                            allPredicates={predicates}
-                            referencableQuestions={referencableQuestions}
-                            onPredicateChange={nextPredicate =>
-                                updatePredicateAt(predicateIndex, nextPredicate)
-                            }
-                            onRemovePredicate={() =>
-                                removePredicateAt(predicateIndex)
-                            }
-                        />
-                    </li>
-                ))}
-            </ul>
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addPredicate}
-                disabled={!canAddMorePredicates}
-            >
-                <Plus />
-                Add condition
-            </Button>
+                {previewSentence && (
+                    <p className="text-muted-foreground text-sm">
+                        <span className="text-foreground font-medium">
+                            Preview:
+                        </span>{' '}
+                        Shown when {previewSentence}
+                    </p>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <PrerequisiteNodeEditor
+                nodeExpression={prerequisiteExpression}
+                referencableQuestions={referencableQuestions}
+                otherSiblingPredicates={[]}
+                onNodeExpressionChange={onPrerequisiteExpressionChange}
+                onRemoveNode={() => onPrerequisiteExpressionChange(null)}
+                canRemoveNode={false}
+            />
             {previewSentence && (
-                <p className="text-muted-foreground border-border/60 border-t pt-3 text-sm">
+                <p className="text-muted-foreground text-sm">
                     <span className="text-foreground font-medium">
                         Preview:
                     </span>{' '}

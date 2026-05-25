@@ -40,6 +40,7 @@ import OptionsEditor from './options-editor';
 import PrerequisiteEditor from '../prerequisite/prerequisite-editor';
 import { QUESTION_TYPE_LABELS } from '@/features/form-builder/utils/question-type-labels';
 import type { Result } from '@/lib/result/result';
+import { simplifyPrerequisiteExpression } from '@/features/form-builder/utils/prerequisite';
 
 const QUESTION_FORM_ID = 'question-form';
 
@@ -75,7 +76,9 @@ export default function QuestionForm({
                   type: questionBeingEdited.type,
                   required: questionBeingEdited.required,
                   options: questionBeingEdited.options ?? [],
-                  prerequisite: questionBeingEdited.prerequisite,
+                  prerequisite: simplifyPrerequisiteExpression(
+                      questionBeingEdited.prerequisite,
+                  ),
               }
             : {
                   label: '',

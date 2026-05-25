@@ -41,11 +41,6 @@ export const prerequisiteExpressionSchema = z.union([
             return z.array(prerequisiteExpressionSchema);
         },
     }),
-    z.object({
-        get not() {
-            return prerequisiteExpressionSchema;
-        },
-    }),
 ]);
 
 export type PrerequisiteOperator = z.infer<typeof prerequisiteOperatorSchema>;

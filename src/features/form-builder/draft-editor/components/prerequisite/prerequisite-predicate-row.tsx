@@ -6,11 +6,11 @@ import type {
     PrerequisitePredicate,
 } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import {
-    getDefaultValueForPredicate,
-    getOperatorsUsedOnQuestion,
-    OPERATOR_LABELS,
-    OPERATORS_BY_QUESTION_TYPE,
-} from '../../../utils/prerequisite';
+    getDefaultPredicateValue,
+    getOperatorsAlreadyUsedOnQuestion,
+    PREREQUISITE_OPERATOR_LABELS,
+    PREREQUISITE_OPERATORS_BY_QUESTION_TYPE,
+} from '@/features/form-builder/utils/prerequisite';
 import {
     Select,
     SelectContent,
@@ -29,8 +29,7 @@ import PrerequisiteValueInput from './prerequisite-value-input';
 
 interface PrerequisitePredicateRowProps {
     predicate: PrerequisitePredicate;
-    predicateIndex: number;
-    allPredicates: PrerequisitePredicate[];
+    otherSiblingPredicates: PrerequisitePredicate[];
     referencableQuestions: FormQuestion[];
     onPredicateChange: (nextPredicate: PrerequisitePredicate) => void;
     onRemovePredicate: () => void;
@@ -38,8 +37,7 @@ interface PrerequisitePredicateRowProps {
 
 export default function PrerequisitePredicateRow({
     predicate,
-    predicateIndex,
-    allPredicates,
+    otherSiblingPredicates,
     referencableQuestions,
     onPredicateChange,
     onRemovePredicate,
@@ -49,15 +47,16 @@ export default function PrerequisitePredicateRow({
     );
 
     const conflictingOperatorsOnCurrentQuestion = referencedQuestion
-        ? getOperatorsUsedOnQuestion(
-              allPredicates,
+        ? getOperatorsAlreadyUsedOnQuestion(
+              otherSiblingPredicates,
               referencedQuestion.id,
-              predicateIndex,
           )
         : [];
 
     const availableOperators = referencedQuestion
-        ? OPERATORS_BY_QUESTION_TYPE[referencedQuestion.type].filter(
+        ? PREREQUISITE_OPERATORS_BY_QUESTION_TYPE[
+              referencedQuestion.type
+          ].filter(
               operator =>
                   !conflictingOperatorsOnCurrentQuestion.includes(operator),
           )
@@ -65,13 +64,15 @@ export default function PrerequisitePredicateRow({
 
     const selectableQuestions = referencableQuestions.filter(
         candidateQuestion => {
-            const usedOperatorsOnCandidate = getOperatorsUsedOnQuestion(
-                allPredicates,
-                candidateQuestion.id,
-                predicateIndex,
-            );
-            return OPERATORS_BY_QUESTION_TYPE[candidateQuestion.type].some(
-                operator => !usedOperatorsOnCandidate.includes(operator),
+            const operatorsAlreadyUsedOnCandidate =
+                getOperatorsAlreadyUsedOnQuestion(
+                    otherSiblingPredicates,
+                    candidateQuestion.id,
+                );
+            return PREREQUISITE_OPERATORS_BY_QUESTION_TYPE[
+                candidateQuestion.type
+            ].some(
+                operator => !operatorsAlreadyUsedOnCandidate.includes(operator),
             );
         },
     );
@@ -90,7 +91,7 @@ export default function PrerequisitePredicateRow({
         const nextValue =
             'value' in revisedPartialPredicate
                 ? revisedPartialPredicate.value
-                : getDefaultValueForPredicate(nextQuestion, nextOperator);
+                : getDefaultPredicateValue(nextQuestion, nextOperator);
         onPredicateChange({
             questionId: nextQuestionId,
             operator: nextOperator,
@@ -103,14 +104,16 @@ export default function PrerequisitePredicateRow({
             candidate => candidate.id === nextReferencedQuestionId,
         );
         if (!nextReferencedQuestion) return;
-        const usedOperatorsOnNextQuestion = getOperatorsUsedOnQuestion(
-            allPredicates,
-            nextReferencedQuestion.id,
-            predicateIndex,
-        );
-        const firstAvailableOperator = OPERATORS_BY_QUESTION_TYPE[
+        const operatorsAlreadyUsedOnNextQuestion =
+            getOperatorsAlreadyUsedOnQuestion(
+                otherSiblingPredicates,
+                nextReferencedQuestion.id,
+            );
+        const firstAvailableOperator = PREREQUISITE_OPERATORS_BY_QUESTION_TYPE[
             nextReferencedQuestion.type
-        ].find(operator => !usedOperatorsOnNextQuestion.includes(operator));
+        ].find(
+            operator => !operatorsAlreadyUsedOnNextQuestion.includes(operator),
+        );
         if (!firstAvailableOperator) return;
         revisePredicate({
             questionId: nextReferencedQuestion.id,
@@ -155,7 +158,7 @@ export default function PrerequisitePredicateRow({
                 <SelectContent>
                     {availableOperators.map(operatorOption => (
                         <SelectItem key={operatorOption} value={operatorOption}>
-                            {OPERATOR_LABELS[operatorOption]}
+                            {PREREQUISITE_OPERATOR_LABELS[operatorOption]}
                         </SelectItem>
                     ))}
                 </SelectContent>
