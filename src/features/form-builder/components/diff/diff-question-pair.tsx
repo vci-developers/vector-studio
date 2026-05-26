@@ -35,7 +35,7 @@ export default function DiffQuestionPair({
                     />
                 ) : (
                     <div className="text-muted-foreground border-border bg-muted/40 flex h-full items-center justify-center rounded-md border border-dashed px-3 py-6 text-xs italic">
-                        Not in your draft
+                        Not in this version
                     </div>
                 )}
             </div>
@@ -50,7 +50,7 @@ export default function DiffQuestionPair({
                     />
                 ) : (
                     <div className="text-muted-foreground border-border bg-muted/40 flex h-full items-center justify-center rounded-md border border-dashed px-3 py-6 text-xs italic">
-                        Not in this version
+                        Not in your draft
                     </div>
                 )}
             </div>

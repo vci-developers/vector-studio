@@ -41,8 +41,8 @@ export default function HistoricalViewer({
         )
             return null;
         return computeFormVersionDiff(
-            getDraftFormByProgramIdResult.data,
             getProgramFormByVersionResult.data,
+            getDraftFormByProgramIdResult.data,
         );
     }, [getProgramFormByVersionResult, getDraftFormByProgramIdResult]);
 
@@ -94,10 +94,10 @@ export default function HistoricalViewer({
             {formVersionDiff && (
                 <DiffQuestionList
                     questionDiffs={formVersionDiff.questionDiffs}
-                    fromForm={draftForm}
-                    toForm={viewedForm}
-                    fromColumnLabel="Your draft"
-                    toColumnLabel={`Version ${viewedForm.version}`}
+                    fromForm={viewedForm}
+                    toForm={draftForm}
+                    fromColumnLabel={`Version ${viewedForm.version}`}
+                    toColumnLabel="Your draft"
                 />
             )}
             <CheckoutConfirmDialog
