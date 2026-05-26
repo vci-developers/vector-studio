@@ -35,14 +35,14 @@ which further obscures the intermediate name's purpose.
 
 **Proposed renames (linked — must be applied together):**
 
-| Site | Before | After |
-|---|---|---|
-| `prerequisite.ts:52` (function definition) | `getPrerequisiteGroupParts` | `parseGroupExpression` |
-| `prerequisite.ts:88` (call in `simplifyPrerequisiteExpression`) | `const groupParts = getPrerequisiteGroupParts(...)` | `const group = parseGroupExpression(...)` |
-| `prerequisite.ts:205` (call in `describePrerequisiteExpression`) | `const groupParts = getPrerequisiteGroupParts(...)` | `const group = parseGroupExpression(...)` |
-| `prerequisite-node-editor.tsx:12` (import) | `getPrerequisiteGroupParts` | `parseGroupExpression` |
-| `prerequisite-node-editor.tsx:57` (call) | `const groupParts = getPrerequisiteGroupParts(...)` | `const group = parseGroupExpression(...)` |
-| `prerequisite-node-editor.tsx:59` (destructure) | `const { connector: groupConnector, childExpressions } = groupParts;` | `const { connector: groupConnector, childExpressions } = group;` |
+| Site                                                             | Before                                                                | After                                                            |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `prerequisite.ts:52` (function definition)                       | `getPrerequisiteGroupParts`                                           | `parseGroupExpression`                                           |
+| `prerequisite.ts:88` (call in `simplifyPrerequisiteExpression`)  | `const groupParts = getPrerequisiteGroupParts(...)`                   | `const group = parseGroupExpression(...)`                        |
+| `prerequisite.ts:205` (call in `describePrerequisiteExpression`) | `const groupParts = getPrerequisiteGroupParts(...)`                   | `const group = parseGroupExpression(...)`                        |
+| `prerequisite-node-editor.tsx:12` (import)                       | `getPrerequisiteGroupParts`                                           | `parseGroupExpression`                                           |
+| `prerequisite-node-editor.tsx:57` (call)                         | `const groupParts = getPrerequisiteGroupParts(...)`                   | `const group = parseGroupExpression(...)`                        |
+| `prerequisite-node-editor.tsx:59` (destructure)                  | `const { connector: groupConnector, childExpressions } = groupParts;` | `const { connector: groupConnector, childExpressions } = group;` |
 
 ---
 
@@ -62,8 +62,8 @@ uses the right word.
 
 **Proposed rename:**
 
-| Site | Before | After |
-|---|---|---|
+| Site                                | Before                                  | After                                   |
+| ----------------------------------- | --------------------------------------- | --------------------------------------- |
 | `prerequisite-predicate-row.tsx:49` | `conflictingOperatorsOnCurrentQuestion` | `operatorsAlreadyUsedOnCurrentQuestion` |
 
 ---
@@ -83,11 +83,11 @@ the counterpart should mirror that register.
 
 **Proposed renames:**
 
-| Site | Before | After |
-|---|---|---|
-| `question-order.ts:49` | `swapPartnerIndex` | `adjacentSiblingIndex` |
-| `question-order.ts:53` | `swapPartner` | `adjacentSibling` |
-| `question-order.ts:54` | `!questionToMove \|\| !swapPartner` | `!questionToMove \|\| !adjacentSibling` |
+| Site                   | Before                                                | After                                                     |
+| ---------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `question-order.ts:49` | `swapPartnerIndex`                                    | `adjacentSiblingIndex`                                    |
+| `question-order.ts:53` | `swapPartner`                                         | `adjacentSibling`                                         |
+| `question-order.ts:54` | `!questionToMove \|\| !swapPartner`                   | `!questionToMove \|\| !adjacentSibling`                   |
 | `question-order.ts:57` | `{ id: swapPartner.id, order: questionToMove.order }` | `{ id: adjacentSibling.id, order: questionToMove.order }` |
 
 ---
@@ -106,14 +106,14 @@ the right word.
 
 **Proposed rename:**
 
-| Site | Before | After |
-|---|---|---|
-| `options-editor.tsx:19` (state declaration) | `draftOption, setDraftOption` | `pendingOption, setPendingOption` |
-| `options-editor.tsx:22` | `draftOption.trim()` | `pendingOption.trim()` |
-| `options-editor.tsx:24` | `setDraftOption('')` | `setPendingOption('')` |
-| `options-editor.tsx:127` | `value={draftOption}` | `value={pendingOption}` |
-| `options-editor.tsx:128` | `setDraftOption(event.target.value)` | `setPendingOption(event.target.value)` |
-| `options-editor.tsx:142` | `draftOption.trim().length === 0` | `pendingOption.trim().length === 0` |
+| Site                                        | Before                               | After                                  |
+| ------------------------------------------- | ------------------------------------ | -------------------------------------- |
+| `options-editor.tsx:19` (state declaration) | `draftOption, setDraftOption`        | `pendingOption, setPendingOption`      |
+| `options-editor.tsx:22`                     | `draftOption.trim()`                 | `pendingOption.trim()`                 |
+| `options-editor.tsx:24`                     | `setDraftOption('')`                 | `setPendingOption('')`                 |
+| `options-editor.tsx:127`                    | `value={draftOption}`                | `value={pendingOption}`                |
+| `options-editor.tsx:128`                    | `setDraftOption(event.target.value)` | `setPendingOption(event.target.value)` |
+| `options-editor.tsx:142`                    | `draftOption.trim().length === 0`    | `pendingOption.trim().length === 0`    |
 
 ---
 
@@ -130,10 +130,10 @@ options for `select` questions. The qualifier "for request" is precise.
 
 **Proposed rename:**
 
-| Site | Before | After |
-|---|---|---|
-| `question-form.tsx:107` (declaration) | `normalizedOptions` | `optionsForRequest` |
-| `question-form.tsx:136` (use) | `options: normalizedOptions,` | `options: optionsForRequest,` |
+| Site                                  | Before                        | After                         |
+| ------------------------------------- | ----------------------------- | ----------------------------- |
+| `question-form.tsx:107` (declaration) | `normalizedOptions`           | `optionsForRequest`           |
+| `question-form.tsx:136` (use)         | `options: normalizedOptions,` | `options: optionsForRequest,` |
 
 ---
 
@@ -161,12 +161,12 @@ preserves the direction while clarifying the key/value order:
 
 **Proposed rename:**
 
-| Site | Before | After |
-|---|---|---|
-| `form-version-diff.ts:82` (declaration) | `matchedFromByToQuestion` | `fromQuestionByToQuestion` |
-| `form-version-diff.ts:122` (`.set`) | `matchedFromByToQuestion.set(matchedToQuestion, matchedFromQuestion)` | `fromQuestionByToQuestion.set(...)` |
-| `form-version-diff.ts:129` (`.get`) | `matchedFromByToQuestion.get(toQuestion)` | `fromQuestionByToQuestion.get(toQuestion)` |
-| `form-version-diff.ts:165` (`.values()`) | `new Set(matchedFromByToQuestion.values())` | `new Set(fromQuestionByToQuestion.values())` |
+| Site                                     | Before                                                                | After                                        |
+| ---------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------- |
+| `form-version-diff.ts:82` (declaration)  | `matchedFromByToQuestion`                                             | `fromQuestionByToQuestion`                   |
+| `form-version-diff.ts:122` (`.set`)      | `matchedFromByToQuestion.set(matchedToQuestion, matchedFromQuestion)` | `fromQuestionByToQuestion.set(...)`          |
+| `form-version-diff.ts:129` (`.get`)      | `matchedFromByToQuestion.get(toQuestion)`                             | `fromQuestionByToQuestion.get(toQuestion)`   |
+| `form-version-diff.ts:165` (`.values()`) | `new Set(matchedFromByToQuestion.values())`                           | `new Set(fromQuestionByToQuestion.values())` |
 
 ---
 
@@ -189,10 +189,10 @@ the same: "do these two IDs point at questions with the same label?"
 
 **Proposed rename:**
 
-| Site | Before | After |
-|---|---|---|
-| `form-version-diff.ts:270` (definition) | `areQuestionReferencesLabelEquivalent` | `questionLabelsMatch` |
-| `form-version-diff.ts:241` (call in `computeFieldChanges`) | `areQuestionReferencesLabelEquivalent(fromQuestion.parentId, ...)` | `questionLabelsMatch(fromQuestion.parentId, ...)` |
+| Site                                                                        | Before                                                                 | After                                                 |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| `form-version-diff.ts:270` (definition)                                     | `areQuestionReferencesLabelEquivalent`                                 | `questionLabelsMatch`                                 |
+| `form-version-diff.ts:241` (call in `computeFieldChanges`)                  | `areQuestionReferencesLabelEquivalent(fromQuestion.parentId, ...)`     | `questionLabelsMatch(fromQuestion.parentId, ...)`     |
 | `form-version-diff.ts:299` (call in `arePrerequisiteExpressionsEquivalent`) | `areQuestionReferencesLabelEquivalent(fromExpression.questionId, ...)` | `questionLabelsMatch(fromExpression.questionId, ...)` |
 
 ---
@@ -201,6 +201,7 @@ the same: "do these two IDs point at questions with the same label?"
 
 The following are complete, ready-to-apply versions of every utils file under
 `src/features/form-builder/`. Each file has:
+
 - Section headers that group related and dependent functions together
 - A single-line `/** ... */` JSDoc above each function
 - All renames from Part 1 applied
@@ -388,8 +389,8 @@ export function swapAdjacentSiblings(
 
 ### `src/features/form-builder/utils/prerequisite.ts`
 
-Changes applied: `getPrerequisiteGroupParts` → `parseGroupExpression`; all
-three internal call sites updated to use `group` instead of `groupParts`.
+Changes applied: `getPrerequisiteGroupParts` → `parseGroupExpression`; all three
+internal call sites updated to use `group` instead of `groupParts`.
 
 ```ts
 import type {
@@ -454,9 +455,7 @@ export const PREREQUISITE_OPERATORS_BY_QUESTION_TYPE: Record<
  * If expression is an `all` or `any` group node, returns its connector and
  * child expressions. Returns null for predicate nodes (`questionId` shape).
  */
-export function parseGroupExpression(
-    expression: PrerequisiteExpression,
-): {
+export function parseGroupExpression(expression: PrerequisiteExpression): {
     connector: PrerequisiteGroupConnector;
     childExpressions: PrerequisiteExpression[];
 } | null {
@@ -636,9 +635,7 @@ function describePrerequisiteExpression(
             ? childDescription
             : `(${childDescription})`;
     });
-    return childDescriptions.join(
-        group.connector === 'all' ? ' AND ' : ' OR ',
-    );
+    return childDescriptions.join(group.connector === 'all' ? ' AND ' : ' OR ');
 }
 
 /**
@@ -906,14 +903,18 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
             if (bestToIndex < 0) break;
             const matchedToQuestion = unmatchedToSiblings[bestToIndex]!;
             const matchedFromQuestion = unmatchedFromSiblings[bestFromIndex]!;
-            fromQuestionByToQuestion.set(matchedToQuestion, matchedFromQuestion);
+            fromQuestionByToQuestion.set(
+                matchedToQuestion,
+                matchedFromQuestion,
+            );
             unmatchedToSiblings.splice(bestToIndex, 1);
             unmatchedFromSiblings.splice(bestFromIndex, 1);
         }
 
         const siblingDiffs: QuestionDiff[] = [];
         for (const toQuestion of sortedToSiblings) {
-            const matchedFromQuestion = fromQuestionByToQuestion.get(toQuestion);
+            const matchedFromQuestion =
+                fromQuestionByToQuestion.get(toQuestion);
             if (matchedFromQuestion) {
                 const fieldChanges = computeFieldChanges(
                     matchedFromQuestion,
@@ -1168,11 +1169,13 @@ repeated here:
 The following were explicitly rejected in the cleanup plan and are not proposed
 again:
 
-- Shortening `findDependentQuestions` / `prerequisiteExpressionReferencesQuestion`
-  (Phase 3 — names carry load-bearing specificity)
-- Shortening `isCreateQuestionInDraftFormPending` / `isUpdateQuestionInDraftFormPending`
-  (Phase 3 — long names connect each flag to its source hook)
-- Renaming `matchedFromByToQuestion` to the short form `matchedFrom`
-  (Phase 8 — loses the Map's indexing direction); this document's proposed
-  `fromQuestionByToQuestion` is a different proposal that preserves the direction
-  while fixing the word order.
+- Shortening `findDependentQuestions` /
+  `prerequisiteExpressionReferencesQuestion` (Phase 3 — names carry load-bearing
+  specificity)
+- Shortening `isCreateQuestionInDraftFormPending` /
+  `isUpdateQuestionInDraftFormPending` (Phase 3 — long names connect each flag
+  to its source hook)
+- Renaming `matchedFromByToQuestion` to the short form `matchedFrom` (Phase 8 —
+  loses the Map's indexing direction); this document's proposed
+  `fromQuestionByToQuestion` is a different proposal that preserves the
+  direction while fixing the word order.

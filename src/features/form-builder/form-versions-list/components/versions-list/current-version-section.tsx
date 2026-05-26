@@ -75,7 +75,10 @@ export default function CurrentVersionSection({
                                 {currentForm.name}
                             </span>
                             <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1.5 text-xs font-medium">
-                                <span className="bg-success size-1.5 rounded-full" aria-hidden="true" />
+                                <span
+                                    className="bg-success size-1.5 rounded-full"
+                                    aria-hidden="true"
+                                />
                                 Active
                             </span>
                         </div>
