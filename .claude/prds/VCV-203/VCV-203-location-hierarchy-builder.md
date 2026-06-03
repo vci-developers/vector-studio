@@ -6,9 +6,9 @@ When an admin sets up a hierarchical Program, there is no way to define that
 Program's location structure from the app. The **Location Types** (the ordered
 **Levels** such as District → SubCounty → Parish → Village) can only be created
 by hand via raw API calls (Postman). Admins need to build and maintain a
-Program's hierarchy — add levels, rename them, reorder them, and remove
-unused ones — inside the survey-builder app, without corrupting Sites that
-already exist.
+Program's hierarchy — add levels, rename them, reorder them, and remove unused
+ones — inside the survey-builder app, without corrupting Sites that already
+exist.
 
 ## Solution
 
@@ -22,8 +22,8 @@ at the top) and lets an authorized admin:
 - delete a Level that no Site uses.
 
 The builder enforces safety guardrails on the frontend so a reorder or delete
-can never invert or orphan existing Site trees, since the backend does not
-guard these operations (see ADR 0001).
+can never invert or orphan existing Site trees, since the backend does not guard
+these operations (see ADR 0001).
 
 ## User Stories
 
@@ -54,18 +54,19 @@ guard these operations (see ADR 0001).
 11. As a program admin, I want the builder to prevent me from inserting a new
     Level above any Level that already has Sites, so that occupied Levels keep
     their position.
-12. As a program admin, I want to delete a Level that no Site uses, so that I can
-    remove a mistake during setup.
-13. As a program admin, I want the delete control disabled for any Level that has
-    Sites, so that I understand up front that it cannot be removed.
+12. As a program admin, I want to delete a Level that no Site uses, so that I
+    can remove a mistake during setup.
+13. As a program admin, I want the delete control disabled for any Level that
+    has Sites, so that I understand up front that it cannot be removed.
 14. As a program admin, I want a clear error if a delete is rejected because
     Sites reference the Level, so that I know why it was blocked.
-15. As a program admin, I want my changes to persist and still be correct after a
-    page reload, so that I can trust the builder.
+15. As a program admin, I want my changes to persist and still be correct after
+    a page reload, so that I can trust the builder.
 16. As a program admin, I want all builder actions to require my authenticated,
     authorized session, so that unauthorized users cannot alter the hierarchy.
 17. As a user without site-write permission, I want the builder's editing
-    controls to be unavailable, so that I cannot make changes I'm not allowed to.
+    controls to be unavailable, so that I cannot make changes I'm not allowed
+    to.
 18. As a program admin, I want the order I see to be driven by stored Level
     values rather than incidental list position, so that the displayed order is
     reliable even if Levels were created out of order.
@@ -121,15 +122,15 @@ guard these operations (see ADR 0001).
 
 - **Location Type resource module** — request/response Zod schemas (with derived
   types), server functions, and TanStack Query hooks: `useGetLocationTypes`,
-  `usePostLocationType`, `usePutLocationType`, `useDeleteLocationType`. Mutations
-  invalidate the Location Type query keys on success. Follows the existing
-  per-resource convention (keys factory, `fetchXxx` query fn, composed
+  `usePostLocationType`, `usePutLocationType`, `useDeleteLocationType`.
+  Mutations invalidate the Location Type query keys on success. Follows the
+  existing per-resource convention (keys factory, `fetchXxx` query fn, composed
   `onSuccess` invalidation).
-- **BFF routes** mirroring the backend 1-1, using the established `RouteParams` +
-  `Number(...)` path coercion (no Zod on path params) and `Result<T, E>`
-  responses:
-  - collection route → `GET` (list), `POST` (create)
-  - item route keyed by location type id → `PUT` (rename/reorder), `DELETE`
+- **BFF routes** mirroring the backend 1-1, using the established
+  `RouteParams` + `Number(...)` path coercion (no Zod on path params) and
+  `Result<T, E>` responses:
+    - collection route → `GET` (list), `POST` (create)
+    - item route keyed by location type id → `PUT` (rename/reorder), `DELETE`
 - **Level model builder (deep module)** — pure function mapping
   `(locationTypes, canAccessSites)` to an ordered list of Level rows annotated
   with occupancy and per-Level capability flags (`canReorder`, `canDelete`,
@@ -137,8 +138,8 @@ guard these operations (see ADR 0001).
   invariant, sort-by-`level`, and gap tolerance behind one interface.
 - **Reorder planner (deep module)** — pure function mapping
   `(orderedLevels, fromPosition, toPosition)` to the minimal set of
-  `{ id, level }` updates the client must `PUT`. The builder issues one `PUT` per
-  changed row, then invalidates the Location Type keys.
+  `{ id, level }` updates the client must `PUT`. The builder issues one `PUT`
+  per changed row, then invalidates the Location Type keys.
 - **Location Builder feature + `/locations` route** — a new feature module and
   page that derive `programId` from the session (no `programId` in the page
   URL), apply the Uganda + `writeSiteMetadata` gate, and compose the Level list
@@ -153,15 +154,15 @@ guard these operations (see ADR 0001).
 
 ## Testing Decisions
 
-- **No automated tests this round.** The repo currently has no test runner
-  (only `typecheck`, `lint`, `format`). Confidence comes from `typecheck` + lint
-  + manual verification, matching the repo's current state.
+- **No automated tests this round.** The repo currently has no test runner (only
+  `typecheck`, `lint`, `format`). Confidence comes from `typecheck` + lint
+    - manual verification, matching the repo's current state.
 - The deep modules (Level model builder, reorder planner) are nonetheless built
   as **pure functions with no side effects**, so they can be unit-tested in
   isolation later without refactoring. Good tests would assert **external
-  behavior only** — e.g. "given these Location Types and accessible Sites, Levels
-  1..k are frozen and the tail is editable", "moving a tail Level produces this
-  minimal set of level updates" — never internal structure.
+  behavior only** — e.g. "given these Location Types and accessible Sites,
+  Levels 1..k are frozen and the tail is editable", "moving a tail Level
+  produces this minimal set of level updates" — never internal structure.
 - Style prior art for pure, isolated utilities: the form-builder utilities
   (`question-order`, `walk-questions`). When a runner is introduced, those are
   the modules to cover first.
@@ -182,9 +183,9 @@ guard these operations (see ADR 0001).
 
 ## Further Notes
 
-- **Assumptions to verify against the live backend** before/while building:
-  the `GET` location-types response includes `level`; there is no backend
-  uniqueness check on `level` (the client enforces the ordering invariant); a
-  rename truly propagates into existing Sites' location hierarchy.
+- **Assumptions to verify against the live backend** before/while building: the
+  `GET` location-types response includes `level`; there is no backend uniqueness
+  check on `level` (the client enforces the ordering invariant); a rename truly
+  propagates into existing Sites' location hierarchy.
 - Decision record: see `.claude/docs/adr/0001-location-type-reorder-safety.md`.
 - Domain language and invariants: see `.claude/CONTEXT.md`.

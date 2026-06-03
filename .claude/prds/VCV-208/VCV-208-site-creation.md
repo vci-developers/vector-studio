@@ -51,9 +51,9 @@ Level/name pair. Sites are created one at a time, top-down.
     set automatically from my selections, so that I don't manage internal ids.
 12. As a program admin, I want to create Sites one at a time at every Level, so
     that the flow is consistent and never confusing.
-13. As a program admin, after creating a Site, I want it to become available as a
-    selectable parent for deeper Sites, so that I can continue building down the
-    tree in one sitting.
+13. As a program admin, after creating a Site, I want it to become available as
+    a selectable parent for deeper Sites, so that I can continue building down
+    the tree in one sitting.
 14. As a program admin, I want clear validation if I submit without a required
     name or parent, so that I can correct mistakes before saving.
 15. As a program admin, I want a clear error if creation fails on the server, so
@@ -74,9 +74,9 @@ Level/name pair. Sites are created one at a time, top-down.
 22. As an admin, I want a root Site shown with its full hierarchy context (not
     just its name), so that two Sites with the same name in different trees are
     never confused.
-23. As an admin with access to a mid-level Site, I want its ancestor Levels shown
-    as read-only context, so that I can see where my subtree sits without being
-    able to edit Sites I don't own.
+23. As an admin with access to a mid-level Site, I want its ancestor Levels
+    shown as read-only context, so that I can see where my subtree sits without
+    being able to edit Sites I don't own.
 24. As an admin, I want the breadcrumb to always reflect the full path of the
     tree I'm in, so that I never lose track of my location across trees.
 
@@ -102,18 +102,18 @@ Level/name pair. Sites are created one at a time, top-down.
 **UI direction**
 
 - The Site hierarchy uses a **column view (Miller columns)** — side-by-side list
-  panes drilled left-to-right, one column per Level — in the modern cloud-console
-  register (Apple Finder / AWS Organizations / GCP Resource Manager). Explicitly
-  **not** a tree-outline (reads as DHIS2) and **not** a node-graph/flow-chart
-  canvas, both of which scale poorly for data entry.
+  panes drilled left-to-right, one column per Level — in the modern
+  cloud-console register (Apple Finder / AWS Organizations / GCP Resource
+  Manager). Explicitly **not** a tree-outline (reads as DHIS2) and **not** a
+  node-graph/flow-chart canvas, both of which scale poorly for data entry.
 - The pattern encodes the domain rules structurally: selecting a parent in one
   column reveals its children in the next (enforces "parent = immediately-higher
-  Level"); columns only show Sites from `canAccessSites` (access scoping); "+ New
-  {Level}" is a ghost button at each column's bottom expanding to an **inline
-  input** (no modal) for fast top-down creation; root creation is the "+" on the
-  first column (the program-admin-gated action).
-- Polish details: sticky column headers with a **lock glyph** on frozen Levels, a
-  **breadcrumb** above the canvas that doubles as the responsive collapse on
+  Level"); columns only show Sites from `canAccessSites` (access scoping); "+
+  New {Level}" is a ghost button at each column's bottom expanding to an
+  **inline input** (no modal) for fast top-down creation; root creation is the
+  "+" on the first column (the program-admin-gated action).
+- Polish details: sticky column headers with a **lock glyph** on frozen Levels,
+  a **breadcrumb** above the canvas that doubles as the responsive collapse on
   narrow widths, per-column search, arrow-key navigation, per-column skeletons
   and empty states.
 
@@ -124,8 +124,9 @@ Level/name pair. Sites are created one at a time, top-down.
   always make clear **which tree a hierarchy belongs to**.
 - The first column is **"your trees"** — the user's accessible roots (the
   topmost granted node of each subtree). Each root is labeled with its **full
-  hierarchy context** sourced from `locationHierarchy` (e.g. `Mayuge › Malongo`),
-  never its bare name, so identical names in different trees are never confused.
+  hierarchy context** sourced from `locationHierarchy` (e.g.
+  `Mayuge › Malongo`), never its bare name, so identical names in different
+  trees are never confused.
 - The **breadcrumb is anchored to the selected root's full path**, including any
   ancestor Levels above an accessible mid-level root, shown as read-only/greyed
   context (the user cannot edit Sites they don't have access to).
@@ -135,8 +136,8 @@ Level/name pair. Sites are created one at a time, top-down.
 
 **Modules to build**
 
-- **Site creation resource** — extend the existing Site resource with a
-  `POST` request schema and full-Site response schema (reusing the existing Site
+- **Site creation resource** — extend the existing Site resource with a `POST`
+  request schema and full-Site response schema (reusing the existing Site
   shape), a server function, a BFF route, and a `usePostSite` hook. On success
   the hook invalidates the user-permissions query so the newly created Site
   appears in `canAccessSites` and becomes a selectable parent.
@@ -158,7 +159,8 @@ Level/name pair. Sites are created one at a time, top-down.
 - `POST` body: `{ programId, locationTypeId, parentId?, name, isActive }` where
   `parentId` is omitted/null for a root and required otherwise, and `isActive`
   defaults to `true` (Site activation management is out of scope).
-- Response: the created Site, including the backend-composed `locationHierarchy`.
+- Response: the created Site, including the backend-composed
+  `locationHierarchy`.
 
 ## Testing Decisions
 
