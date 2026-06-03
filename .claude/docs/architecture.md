@@ -4,7 +4,7 @@ _Created: Mar 8, 2026 | Last Updated: Mar 8, 2026_
 
 ## Why This Document Matters
 
-This is the core technical resource for understanding how the VectorVerify web
+This is the core technical resource for understanding how the VectorStudio web
 application is built and structured. Every developer, intern, or contributor
 should read this carefully before attempting feature work.
 
@@ -25,7 +25,7 @@ This guide explains:
 - Key files and how they interact
 - Performance and implementation considerations
 
-VectorVerify is built with Next.js, React, TypeScript, TanStack Query, and Zod.
+VectorStudio is built with Next.js, React, TypeScript, TanStack Query, and Zod.
 The project uses strict TypeScript settings, path aliases, and lint-enforced
 module boundaries to keep the architecture disciplined and scalable.
 
@@ -33,7 +33,7 @@ module boundaries to keep the architecture disciplined and scalable.
 
 ## Architectural Philosophy: Modular, Boundary-Driven, and Server-Aware
 
-VectorVerify is designed to be modular, predictable, and maintainable as the
+VectorStudio is designed to be modular, predictable, and maintainable as the
 system evolves. The architecture emphasizes clear boundaries between different
 parts of the application so that developers can reason about behavior locally
 without needing to understand the entire codebase at once.

@@ -8,7 +8,7 @@ Writing code is not just about making something work — it's about making it
 clear, maintainable, and consistent with the rest of the system.
 
 This document outlines the standards and conventions expected when working on
-the VectorVerify web application.
+the VectorStudio web application.
 
 ---
 

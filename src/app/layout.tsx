@@ -4,6 +4,8 @@ import './globals.css';
 import { cn } from '@/utils/cn';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { TanstackProvider } from '@/components/providers/tanstack-provider';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -47,7 +49,10 @@ export default function RootLayout({
                     enableSystem
                     disableTransitionOnChange
                 >
-                    <TanstackProvider>{children}</TanstackProvider>
+                    <TooltipProvider delayDuration={200}>
+                        <TanstackProvider>{children}</TanstackProvider>
+                        <Toaster />
+                    </TooltipProvider>
                 </ThemeProvider>
             </body>
         </html>
