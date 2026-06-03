@@ -106,11 +106,10 @@ Five contract files under `src/api/location-type/contracts/`:
 
 ### Outstanding
 
-- `npm run format` not yet run — prettier flags 2 files (missing semicolon in
-  `get-location-types-by-program-id-schema.ts`; `}).partial()` chaining in
-  `put-location-type-by-program-id-schema.ts`). Run before committing.
+- ~~`npm run format` not yet run~~ — resolved in Phase 2: prettier now passes on
+  all `src/api/location-type/**` files (contracts included).
 
-## Phase 2 — Server functions + BFF routes
+## Phase 2 — Server functions + BFF routes ✅ Completed
 
 ### Server functions — `src/api/location-type/`
 
@@ -142,7 +141,71 @@ Use the backend paths confirmed in the pre-flight check (expected:
 
 **Checkpoint:** `npm run typecheck && npm run lint`.
 
-## Phase 3 — Query keys + TanStack Query hooks
+### What was implemented
+
+Four server functions under `src/api/location-type/` and two BFF routes under
+`src/app/api/programs/[programId]/location-types/`, each mirroring the closest
+`form` / `form-question` precedent line-for-line.
+
+Server functions (filename = contract filename minus `-schema`, name matches):
+
+- `get-location-types-by-program-id.ts` —
+  `getLocationTypesByProgramId(accessToken, programId)`. No-body `GET` to
+  `/programs/${programId}/location-types`. Mirrors `getFormsByProgramId`.
+- `post-location-type-to-program.ts` —
+  `postLocationTypeToProgram(accessToken, programId, requestBody)`.
+  `safeParse` → `err({ kind: 'client' })` guard, then `POST`. Mirrors
+  `postQuestionToDraftForm`.
+- `put-location-type-by-program-id.ts` —
+  `putLocationTypeByProgramId(accessToken, programId, locationTypeId, requestBody)`.
+  Same `safeParse` guard, then `PUT` to
+  `/programs/${programId}/location-types/${locationTypeId}`. Mirrors
+  `putQuestionToDraftForm`.
+- `delete-location-type-from-program.ts` —
+  `deleteLocationTypeFromProgram(accessToken, programId, locationTypeId)`.
+  No-body `DELETE` by id. Mirrors `deleteQuestionFromDraftForm`.
+
+BFF routes:
+
+- `location-types/route.ts` — `GET` (list) + `POST` (create). `RouteParams` with
+  `{ programId }`, `Number((await params).programId)` coercion; `POST` parses
+  JSON in try/catch → `err({ kind: 'client', status: 400 })` on bad body. Both
+  wrap the server fn in `withAuthSession<…>` and return
+  `NextResponse.json(result, { status: result.ok ? 200 : (result.error.status ?? 400) })`.
+  Mirrors `forms/route.ts` + `forms/questions/route.ts`.
+- `location-types/[locationTypeId]/route.ts` — `PUT` (rename/reorder) +
+  `DELETE`. `RouteParams` with `{ programId, locationTypeId }`, both
+  `Number(...)`-coerced via the `routeParams` destructure. Mirrors
+  `questions/[questionId]/route.ts` verbatim.
+
+Variable naming follows the `authorized…Result` convention
+(`authorizedGetLocationTypesByProgramIdResult`, etc.).
+
+`npm run typecheck`, `npm run lint`, and `npx prettier --check` (server fns,
+routes, **and** contracts) all pass.
+
+### Deviations from the plan
+
+- **Verbose server-function names** replace the manifest shorthand
+  (`getLocationTypes` → `getLocationTypesByProgramId`, `postLocationType` →
+  `postLocationTypeToProgram`, `putLocationType` → `putLocationTypeByProgramId`,
+  `deleteLocationType` → `deleteLocationTypeFromProgram`). This carries the
+  Phase 1 decision through so each server fn's name and filename mirror its
+  contract 1:1 (exactly as `put-draft-form-by-program-id.ts` ↔
+  `putDraftFormByProgramId`). Supersedes the manifest/§Phase 2 shorthand and the
+  File manifest at the bottom of this document.
+
+### Outstanding
+
+- **Backend pre-flight not run** (PRD "Further Notes" / §⚠️). Per direction, the
+  Phase 1 contracts are **trusted as-is**: paths
+  `/programs/{programId}/location-types[/{locationTypeId}]`, response envelopes
+  `{ locationTypes }` / `{ message, locationType }` / `{ message }`, and request
+  bodies `{ name, level }` / `{ name?, level? }`. If a live call later
+  contradicts these, fix the Phase 1 schemas first — everything downstream
+  derives from them.
+
+## Phase 3 — Query keys + TanStack Query hooks ✅ Completed
 
 ### `src/api/location-type/location-type-keys.ts`
 
@@ -176,6 +239,66 @@ just invalidate the Location Type key. Model on
 `use-put-draft-form-by-program-id.ts`.
 
 **Checkpoint:** `npm run typecheck`.
+
+### What was implemented
+
+One keys factory and four hooks under `src/api/location-type/`, each mirroring
+the closest `form` / `form-question` precedent line-for-line.
+
+- `location-type-keys.ts` — `locationTypeKeys` with
+  `root: ['location-types']` and
+  `locationTypesByProgramId(programId) => ['location-types', programId]`.
+  Mirrors `form-keys.ts`; the scoped method name mirrors the server function
+  (`getLocationTypesByProgramId` → `locationTypesByProgramId`, exactly as
+  `formsByProgramId`).
+- `hooks/use-get-location-types-by-program-id.ts` —
+  `useGetLocationTypesByProgramId(programId, options?)`. Extracted
+  `fetchLocationTypesByProgramId` `GET`s `/api/programs/${programId}/location-types`
+  with `credentials: 'include'`; query key
+  `locationTypeKeys.locationTypesByProgramId(programId)`. Mirrors
+  `useGetFormsByProgramId` (`…QueryResult` / `…QueryOptions` types, no schema
+  re-validation).
+- `hooks/use-post-location-type-to-program.ts` —
+  `usePostLocationTypeToProgram()`. Variables `{ programId, requestBody }`;
+  semantic-verb helper `createLocationTypeInProgram` (parallels
+  `createQuestionInDraftForm`). `onSuccess` guarded by `data.ok`, invalidates
+  `locationTypesByProgramId(variables.programId)`. Mirrors
+  `usePostQuestionToDraftForm`.
+- `hooks/use-put-location-type-by-program-id.ts` —
+  `usePutLocationTypeByProgramId()`. Variables
+  `{ programId, locationTypeId, requestBody }`; helper
+  `updateLocationTypeInProgram` `PUT`s
+  `/api/programs/${programId}/location-types/${locationTypeId}`. Same guarded
+  invalidation. Mirrors `usePutQuestionToDraftForm`.
+- `hooks/use-delete-location-type-from-program.ts` —
+  `useDeleteLocationTypeFromProgram()`. Variables
+  `{ programId, locationTypeId }`; helper `removeLocationTypeFromProgram`.
+  Same guarded invalidation. Mirrors `useDeleteQuestionFromDraftForm`.
+
+All four mutations invalidate **only** the Location Type key — never
+user-permissions — since Levels don't change Site occupancy (per ADR 0001 / the
+note above). Mutation hooks expose no `options` parameter; callers attach
+toast/dialog behavior per-call via `mutate(vars, { onSuccess })`, matching the
+established convention. Same-module imports are relative (`../location-type-keys`,
+`../contracts/…`) exactly as `use-get-forms-by-program-id.ts` imports
+`../form-keys`; `Result` / `NetworkError` stay absolute (`@/lib/…`).
+
+`npm run typecheck`, `npm run lint`, and `npx prettier --check src/api/location-type/**`
+all pass.
+
+### Deviations from the plan
+
+- **Verbose hook + key names** replace the manifest shorthand
+  (`useGetLocationTypes` → `useGetLocationTypesByProgramId`, key `byProgramId` →
+  `locationTypesByProgramId`, etc.). This carries the Phase 1–2 decision through
+  so each hook's name, file, types, and key method mirror the server fn /
+  contract 1:1. Supersedes the §Phase 3 shorthand and the File manifest at the
+  bottom of this document.
+- **PUT hook file renamed** from the initially-created
+  `use-put-location-type-by-id.ts` to `use-put-location-type-by-program-id.ts`,
+  so the filename is the exact kebab of its export (`usePutLocationTypeByProgramId`)
+  and mirrors its sibling server fn / contract — matching the codebase rule that
+  every hook file name equals its export name.
 
 ## Phase 4 — Deep modules (pure functions, unit-testable later)
 
