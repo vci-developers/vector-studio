@@ -106,6 +106,17 @@ guard these operations (see ADR 0001).
   area. Editing controls additionally require the `writeSiteMetadata`
   permission.
 
+**UI direction**
+
+- The Levels editor is a clean **vertical reorderable list** (drag handle,
+  inline rename, "+ Add level" pinned at the bottom), in the modern
+  cloud-console register (the Linear-status / Airtable-field idiom). In-use
+  Levels show a **lock glyph + tooltip** and disable delete/reorder, surfacing
+  the frozen-prefix rule visually. It sits as a left rail / top strip beside the
+  Site column view from VCV-208.
+- Explicitly **not** an enterprise tree-outline (reads as DHIS2) and **not** a
+  node-graph/flow-chart canvas.
+
 **Modules to build**
 
 - **Location Type resource module** — request/response Zod schemas (with derived

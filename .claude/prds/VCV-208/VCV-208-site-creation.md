@@ -69,6 +69,16 @@ Level/name pair. Sites are created one at a time, top-down.
     at all, so that I'm not offered a flow that doesn't apply.
 20. As a program admin, I want the form to be unavailable until at least Level 1
     exists, so that I can't create Sites with no Level to classify them.
+21. As an admin with access to more than one Site tree, I want each tree clearly
+    distinguished, so that I always know which hierarchy I'm building in.
+22. As an admin, I want a root Site shown with its full hierarchy context (not
+    just its name), so that two Sites with the same name in different trees are
+    never confused.
+23. As an admin with access to a mid-level Site, I want its ancestor Levels shown
+    as read-only context, so that I can see where my subtree sits without being
+    able to edit Sites I don't own.
+24. As an admin, I want the breadcrumb to always reflect the full path of the
+    tree I'm in, so that I never lose track of my location across trees.
 
 ## Implementation Decisions
 
@@ -88,6 +98,40 @@ Level/name pair. Sites are created one at a time, top-down.
 - Only the **hierarchical** form is in scope. The legacy flat form is cut: its
   only Program (Uganda id 1) is gated out of the builder, so it would never
   render.
+
+**UI direction**
+
+- The Site hierarchy uses a **column view (Miller columns)** — side-by-side list
+  panes drilled left-to-right, one column per Level — in the modern cloud-console
+  register (Apple Finder / AWS Organizations / GCP Resource Manager). Explicitly
+  **not** a tree-outline (reads as DHIS2) and **not** a node-graph/flow-chart
+  canvas, both of which scale poorly for data entry.
+- The pattern encodes the domain rules structurally: selecting a parent in one
+  column reveals its children in the next (enforces "parent = immediately-higher
+  Level"); columns only show Sites from `canAccessSites` (access scoping); "+ New
+  {Level}" is a ghost button at each column's bottom expanding to an **inline
+  input** (no modal) for fast top-down creation; root creation is the "+" on the
+  first column (the program-admin-gated action).
+- Polish details: sticky column headers with a **lock glyph** on frozen Levels, a
+  **breadcrumb** above the canvas that doubles as the responsive collapse on
+  narrow widths, per-column search, arrow-key navigation, per-column skeletons
+  and empty states.
+
+**Multi-tree disambiguation**
+
+- A user may have access to more than one Site tree, and a granted root can sit
+  at **any Level** (a grant is the granted node plus its subtree). The UI must
+  always make clear **which tree a hierarchy belongs to**.
+- The first column is **"your trees"** — the user's accessible roots (the
+  topmost granted node of each subtree). Each root is labeled with its **full
+  hierarchy context** sourced from `locationHierarchy` (e.g. `Mayuge › Malongo`),
+  never its bare name, so identical names in different trees are never confused.
+- The **breadcrumb is anchored to the selected root's full path**, including any
+  ancestor Levels above an accessible mid-level root, shown as read-only/greyed
+  context (the user cannot edit Sites they don't have access to).
+- Disambiguation relies on `locationHierarchy` rather than on access to the
+  ancestor Site objects, so a mid-level root still shows its full context for
+  free.
 
 **Modules to build**
 
