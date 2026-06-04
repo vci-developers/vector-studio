@@ -131,15 +131,17 @@ these operations (see ADR 0001).
   `Result<T, E>` responses:
     - collection route → `GET` (list), `POST` (create)
     - item route keyed by location type id → `PUT` (rename/reorder), `DELETE`
-- **Level model builder (deep module)** — pure function mapping
-  `(locationTypes, canAccessSites)` to an ordered list of Level rows annotated
-  with occupancy and per-Level capability flags (`canReorder`, `canDelete`,
-  `canInsertBelow`; rename always allowed). Encapsulates the frozen-prefix
-  invariant, sort-by-`level`, and gap tolerance behind one interface.
-- **Reorder planner (deep module)** — pure function mapping
-  `(orderedLevels, fromPosition, toPosition)` to the minimal set of
-  `{ id, level }` updates the client must `PUT`. The builder issues one `PUT`
-  per changed row, then invalidates the Location Type keys.
+- **Level ordering & occupancy logic** — sort-by-`level`, gap tolerance, and the
+  frozen-prefix occupancy (`[1..k]`) that gates reorder/delete/insert. Built
+  **inline in the builder first** (no pre-defined "model" type or capability-flag
+  view-model); the occupied-prefix count is extracted to a small pure function
+  (`countOccupiedLevels`) only once it is reused across rendering and reorder.
+- **Reorder planning logic** — maps `(fromPosition, toPosition)` over the sorted
+  list to the minimal set of `{ id, level }` updates the client must `PUT`,
+  with a frozen-prefix no-op guard (ADR 0001). Implemented inline in the
+  drag-end handler; extracted to a pure `planReorder(...)` only if it grows
+  non-trivial. The builder issues one `PUT` per changed row, then invalidates
+  the Location Type keys.
 - **Location Builder feature + `/locations` route** — a new feature module and
   page that derive `programId` from the session (no `programId` in the page
   URL), apply the Uganda + `writeSiteMetadata` gate, and compose the Level list
@@ -157,11 +159,12 @@ these operations (see ADR 0001).
 - **No automated tests this round.** The repo currently has no test runner (only
   `typecheck`, `lint`, `format`). Confidence comes from `typecheck` + lint
     - manual verification, matching the repo's current state.
-- The deep modules (Level model builder, reorder planner) are nonetheless built
-  as **pure functions with no side effects**, so they can be unit-tested in
-  isolation later without refactoring. Good tests would assert **external
-  behavior only** — e.g. "given these Location Types and accessible Sites,
-  Levels 1..k are frozen and the tail is editable", "moving a tail Level
+- The ordering/occupancy and reorder-planning logic is built **inline first**,
+  not as upfront deep modules. Any piece extracted to `utils/` (only once reused
+  or non-trivial) is a **pure function with no side effects**, so it can be
+  unit-tested in isolation later without refactoring. Good tests would assert
+  **external behavior only** — e.g. "given these Location Types and accessible
+  Sites, Levels 1..k are frozen and the tail is editable", "moving a tail Level
   produces this minimal set of level updates" — never internal structure.
 - Style prior art for pure, isolated utilities: the form-builder utilities
   (`question-order`, `walk-questions`). When a runner is introduced, those are

@@ -5,6 +5,7 @@ import { Fragment } from 'react';
 export default function Home() {
     return (
         <Fragment>
+            <Link href="/locations">Location Builder</Link>
             <Link href="/forms">Form Builder</Link>
             <LogoutButton />
         </Fragment>

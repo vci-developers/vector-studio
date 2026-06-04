@@ -4,7 +4,7 @@ import type { FormQuestion } from '@/api/form-question/contracts/form-question-s
 import { useGetDraftFormByProgramId } from '@/api/form/hooks/use-get-draft-form-by-program-id';
 import { useState } from 'react';
 import DraftEditorSkeleton from '../loading/draft-editor-skeleton';
-import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
+import ErrorBanner from '@/components/error/error-banner';
 import DeleteQuestionDialog from '../question/delete-question-dialog';
 import QuestionFormSheet from '../question/question-form-sheet';
 import DraftEditorHeader from './draft-editor-header';
@@ -38,7 +38,7 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
 
     if (!getDraftFormByProgramIdResult.ok) {
         return (
-            <FormBuilderErrorBanner
+            <ErrorBanner
                 title="Couldn't load the draft form"
                 error={getDraftFormByProgramIdResult.error}
                 onRetry={() => {

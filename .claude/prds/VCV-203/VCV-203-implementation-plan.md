@@ -29,9 +29,32 @@ assumes their domain language and invariants.
   drag layer is the only place that knows about pointers.
 - **Toasts:** `sonner` is already wired (`src/components/ui/sonner.tsx`); use it
   for save/error feedback as the form-builder does.
-- **No automated tests this round** (no runner in repo). Deep modules are pure
-  functions so they are unit-testable later. Confidence = `typecheck` + `lint` +
-  manual verification.
+- **No automated tests this round** (no runner in repo). Any pure helper we
+  extract later is unit-testable in isolation. Confidence = `typecheck` +
+  `lint` + manual verification.
+
+### Implementation rules (apply to every remaining phase)
+
+- **Build incrementally, inside-out.** Write component logic inline first. Do
+  **not** pre-create utility modules or a standalone "deep modules" layer. Reach
+  for `src/features/location-builder/utils/` only once a piece of logic is
+  actually reused (≥ 2 call sites) or hides genuinely non-trivial logic — and add
+  it then, not before.
+- **Minimal, true utilities only.** An extracted utility is a **pure** function:
+  no React/JSX, no component state, no side effects, no UI-shaped output
+  (capability flags, view-model rows). If it leans on a component concern it
+  stays in the component. Prefer fewer utilities; inline thin wrappers.
+- **No intermediate type interfaces unless absolutely needed.** Reuse the
+  existing contract types (`LocationType`, `Site`) and inline return shapes
+  (`Array<{ id; level }>`, mirroring `swapAdjacentSiblings`) instead of
+  manufacturing row / view-model types.
+- **Descriptive, role-encoding variable names.** Names say what the value is and
+  stores — `occupiedLevelCount`, `levelSortedLocationTypes`, `levelUpdates`,
+  `movedLocationType`. Keep the specific long name; do not shorten to the
+  "shortest unambiguous" form.
+- **Follow existing patterns first.** Mirror the form-builder precedent
+  (`question-order.ts`, `walk-questions.ts`, the gate / list / row component
+  split) before introducing any new variation.
 
 ## ⚠️ Verify against the live backend before/while building (PRD "Further Notes")
 
@@ -300,63 +323,88 @@ all pass.
   and mirrors its sibling server fn / contract — matching the codebase rule that
   every hook file name equals its export name.
 
-## Phase 4 — Deep modules (pure functions, unit-testable later)
+## Phase 4 — Domain logic the builder needs (implement inline; extract on demand) ✅ Completed
 
-New folder `src/features/location-builder/utils/`. **No React, no side
-effects.** Mark the invariant code with `// see ADR 0001`.
+**No upfront utility modules.** This phase is the logic to get right, not a list
+of files to create. Build it inline (memoized) inside the Phase 5 components.
+Promote a piece into `src/features/location-builder/utils/` **only when it earns
+its keep** — reused at ≥ 2 call sites, or hiding genuinely non-trivial logic —
+and only as a **pure** function (no React, no component state, no UI-shaped
+output, no manufactured intermediate types). Work directly off the existing
+`LocationType` / `Site` contract types. Mark any invariant code with
+`// see ADR 0001`.
 
-### 4a. Level model builder — `level-model.ts`
+### 4a. Sort + occupancy (frozen prefix) — see ADR 0001
 
-`buildLevelModel(locationTypes: LocationType[], canAccessSites: Site[]): LevelRow[]`.
+- Always sort the Program's Location Types by `level` ascending; never reason by
+  `level - 1` (gaps are expected — `level` is a sort key). The 1-based ordinal
+  shown in the UI is just the sorted index `+ 1` — no helper.
+- Occupancy `k`: from `canAccessSites`, collect the set of referenced
+  `locationTypeId`s, then walk the level-sorted list and count the contiguous
+  occupied **prefix** (stop at the first Level with no Site, tolerating gaps). By
+  the contiguous-top-prefix invariant the occupied Levels are `[1..k]`; the
+  editable tail is `[k+1..n]`.
+- A Level is frozen (no reorder, no delete, no insert-among) when its sorted
+  index `< k`. **Rename is always allowed** (safe — backend propagates). Editing
+  controls additionally require `writeSiteMetadata` (the v1 `actorCanEditLevels`
+  proxy — ADR 0001 "authority by tier").
+- This occupied-prefix count is the one genuinely non-trivial value and is read
+  by both rendering (lock glyphs / disabled controls) and reorder planning — so
+  it is the **first candidate** for extraction, to a pure
+  `countOccupiedLevels(levelSortedLocationTypes, canAccessSites): number`, _if_
+  the inline version ends up duplicated.
 
-- Sort `locationTypes` by `level` ascending (never reason by `level - 1` — gaps
-  are expected; `level` is a sort key).
-- Compute occupancy `k`: the count of distinct Levels referenced by
-  `canAccessSites` (via `locationTypeId`). By the contiguous-top-prefix
-  invariant, occupied Levels are `[1..k]` in _sorted position_. Derive `k` as
-  "number of leading sorted Levels that have at least one Site," tolerating gaps
-  — i.e. walk the sorted list and count the contiguous occupied prefix.
-- Return one `LevelRow` per Location Type:
-  `{ id, name, level, ordinal /* 1-based sorted position */, isOccupied, canRename: true, canReorder: !isOccupied && actorCanEditLevels, canDelete: !isOccupied && actorCanEditLevels, canInsertBelow: !isOccupied && actorCanEditLevels }`.
-    - **Rename always allowed** (safe — backend propagates).
-    - Occupied (frozen-prefix) rows: no reorder, no delete, no insert-among.
-    - The _editable tail_ `[k+1..n]` is freely editable.
-- `actorCanEditLevels` is passed in (derived in the feature from
-  `writeSiteMetadata` / privilege — ADR 0001 "authority by tier" proxy).
+### 4b. Reorder planning — see ADR 0001
 
-Export `LevelRow` type. Encapsulate sort + occupancy + capability flags behind
-this one function so the UI never recomputes them.
+- On drag-end, map the drag to `(fromIndex, toIndex)` over the sorted list and
+  compute the **minimal** set of `{ id, level }` updates to `PUT`: each row in
+  the affected window `[min, max]` inherits the `level` value of the position it
+  now occupies; unchanged rows (everything outside the window) are omitted.
+  Mirror the bare `{ id, order }[]` return of `swapAdjacentSiblings` — **no**
+  intermediate type.
+- **Guard (last line of defense):** a move whose window reaches into the frozen
+  prefix `[0..k-1]` is a no-op (`[]`). The UI must also prevent it, but this
+  backstops it.
+- Keep it generic (`from → to`) so the `@dnd-kit` layer is the only
+  pointer-aware code. Extract a pure `planReorder(...)` only if the drag-end
+  handler grows non-trivial.
 
-### 4b. Reorder planner — `reorder-plan.ts`
+### 4c. Next level on add
 
-`planReorder(orderedLevels: LevelRow[], fromPosition: number, toPosition: number): Array<{ id: number; level: number }>`.
+- New Level's value = `max(level) + 1` (or `1` when empty), sent explicitly.
+  Trivial — inline it at the add call. Extract a `getNextLevel(locationTypes)`
+  (mirroring `getNextQuestionOrder`) only if it ends up reused.
 
-- Operates on _sorted positions_, not raw `level` values.
-- Returns the **minimal** set of `{ id, level }` updates the client must `PUT`:
-  reassign the moved row and the rows it slid past to the `level` values of the
-  positions they now occupy (i.e. the existing `level` values at the affected
-  positions get reshuffled among the affected rows). Rows outside the
-  `[min(from,to), max(from,to)]` window are untouched → not returned.
-- Guard with `// see ADR 0001`: a move that would touch any occupied
-  (frozen-prefix) position returns `[]` (no-op) — the UI must also prevent it,
-  but the planner is the last line of defense.
-- Generic `from → to` so the `@dnd-kit` layer is the only pointer-aware code;
-  drag-end maps to `(fromIndex, toIndex)`.
+**Checkpoint:** none on its own — this logic is verified as part of Phase 5.
 
-### 4c. Next-level helper
+### What was implemented
 
-`getNextLevel(orderedLevels: LevelRow[]): number` → `max(level) + 1` (or `1`
-when empty). Mirrors `getNextQuestionOrder`. Used by add.
+All three pieces live **inline** in the Phase 5 components — **no `utils/` folder,
+zero feature utilities**. Each derivation has a single call site, so none met the
+"reused ≥ 2 sites" bar; the plan's extraction candidates (`countOccupiedLevels`,
+`planReorder`, `getNextLevel`) were all kept inline.
 
-**Checkpoint:** `npm run typecheck && npm run lint`. (These are the modules a
-future test runner should cover first — assert external behavior only.)
+- **Sort** — `locationTypesSortedByLevel` (`useMemo`) in `location-builder.tsx`.
+- **Occupancy** — computed in `location-builder.tsx` as a **boundary index**,
+  `firstLevelWithNoSitesIndex` (length of the contiguous occupied prefix), passed
+  down once. The per-row flag is `hasSites = index < firstLevelWithNoSitesIndex`.
+  See Phase 5 Deviation 5 for the naming rationale (boundary index, not a count).
+- **Reorder planning** — inline in `LocationLevelList.handleReorder`; the minimal
+  set is a bare `Array<{ id; level }>` (`updatedLocationLevels`), no intermediate
+  type, mirroring `swapAdjacentSiblings`.
+- **Next level** — inline in `AddLocationLevelForm` (`max(level) + 1`, else `1`).
 
-## Phase 5 — Feature UI: Location Builder
+## Phase 5 — Feature UI: Location Builder ✅ Completed
 
 New feature `src/features/location-builder/`. Compose shadcn primitives (`card`,
 `input`, `button`, `tooltip`, `dialog`, `skeleton`, `sonner`). Aesthetic: modern
 cloud-console (Linear-status / Airtable-field idiom), **not** DHIS2
 tree-outline, **not** node-graph (see `feedback_ui_aesthetic` + PRD).
+
+Build the components **inside-out with the Phase 4 logic inline** (sort,
+occupied-prefix count, reorder updates, next level), memoized in the orchestrator
+and handlers. Extract a pure utility under `utils/` **only** once the same logic
+is duplicated or grows non-trivial — see the Implementation rules above.
 
 ### 5a. Add the DnD dependency
 
@@ -378,27 +426,30 @@ builds clean. (Only new dependency in this work.)
 ### 5c. The builder
 
 3. **`components/builder/location-builder.tsx`** — orchestrator. Calls
-   `useGetLocationTypes(programId)`; on success builds `levelModel` via
-   `buildLevelModel(locationTypes, canAccessSites, actorCanEditLevels)`
-   (memoized). Owns add/rename/reorder/delete handlers wiring the mutation
-   hooks. Renders loading skeleton, error banner, empty state, or the list.
-   `actorCanEditLevels = writeSiteMetadata` (v1 proxy per ADR 0001).
+   `useGetLocationTypesByProgramId(programId)`; on success sorts the Location
+   Types by `level` and computes the occupied-prefix count **inline** (memoized;
+   Phase 4a) — no pre-built model or row type. Owns add/rename/reorder/delete
+   handlers wiring the mutation hooks. Renders loading skeleton, error banner,
+   empty state, or the list. `actorCanEditLevels = writeSiteMetadata` (v1 proxy
+   per ADR 0001).
 4. **`components/builder/level-list.tsx`** — the vertical reorderable list.
-   `@dnd-kit` `DndContext` + `SortableContext` (vertical strategy). Renders
-   `LevelRow`s top-to-bottom (Level 1 at top), with a `+ Add level` affordance
-   pinned at the bottom. On drag-end: map to `(fromIndex, toIndex)`, call
-   `planReorder`, then fire one `usePutLocationType` mutation per returned
-   `{ id, level }`; toast on completion; invalidation refreshes the list.
-   Frozen-prefix rows are not draggable and reject drops among them.
+   `@dnd-kit` `DndContext` + `SortableContext` (vertical strategy). Renders the
+   level-sorted Location Types top-to-bottom (Level 1 at top), with a
+   `+ Add level` affordance pinned at the bottom. On drag-end: map to
+   `(fromIndex, toIndex)`, compute the minimal `{ id, level }` updates inline
+   (Phase 4b), then fire one `usePutLocationTypeByProgramId` mutation per update;
+   toast on completion; invalidation refreshes the list. Frozen-prefix rows are
+   not draggable and reject drops among them.
 5. **`components/builder/level-row.tsx`** — single row: drag handle (disabled +
    hidden/greyed for occupied rows), inline rename `Input` (commit on blur/Enter
-   → `usePutLocationType` with `{ name }`), ordinal + name display, delete
-   button (disabled for occupied; opens confirm dialog otherwise). For occupied
-   rows show a **lock glyph + `Tooltip`** explaining the frozen-prefix rule
-   ("This level has sites and can't be moved or removed").
+   → `usePutLocationTypeByProgramId` with `{ name }`), ordinal + name display,
+   delete button (disabled for occupied; opens confirm dialog otherwise). For
+   occupied rows show a **lock glyph + `Tooltip`** explaining the frozen-prefix
+   rule ("This level has sites and can't be moved or removed").
 6. **`components/builder/add-level-row.tsx`** — pinned `+ Add level`; text input
-   → `usePostLocationType({ name, level: getNextLevel(orderedLevels) })`. New
-   Level lands at the bottom automatically.
+   → `usePostLocationTypeToProgram` with `{ name, level }`, where `level` is
+   `max(level) + 1` computed inline (Phase 4c). New Level lands at the bottom
+   automatically.
 7. **`components/builder/delete-level-dialog.tsx`** — confirm dialog (mirror
    `delete-question-dialog.tsx`). On a backend rejection (Sites reference the
    Level), surface a clear error toast/inline message (PRD story 14).
@@ -419,7 +470,110 @@ by `isOccupied`, only by `actorCanEditLevels`.
 
 **Checkpoint:** `npm run typecheck && npm run lint && npm run format`.
 
-## Phase 6 — Route + navigation
+### What was implemented
+
+Actual structure (supersedes the File manifest at the bottom of this doc):
+
+```
+src/features/location-builder/
+├── validation/
+│   └── add-location-level-form-schema.ts
+└── components/
+    ├── location-builder-page-client.tsx
+    ├── builder/
+    │   ├── location-builder.tsx               # orchestrator
+    │   ├── location-level-list.tsx            # @dnd-kit list + reorder
+    │   ├── location-level-row.tsx             # drag/lock, inline rename, delete
+    │   ├── add-location-level-form.tsx        # RHF + zod create form
+    │   └── delete-location-level-dialog.tsx
+    ├── loading/location-builder-skeleton.tsx
+    └── empty-state/
+        ├── no-levels-empty-state.tsx
+        └── uganda-program-empty-state.tsx
+```
+
+Shared, promoted this step (see Deviation 1):
+
+```
+src/components/gate/program-gate.tsx           # generic, slot-based
+src/components/error/error-banner.tsx          # generic, on shadcn Alert
+src/components/ui/alert.tsx                     # npx shadcn add alert
+```
+
+Deleted: `src/features/form-builder/components/gate/program-gate.tsx`,
+`…/components/error/form-builder-error-banner.tsx`. Form-builder's 3 page-clients
+and 5 error-banner consumers were migrated to the shared components.
+
+`npm run typecheck`, `npm run lint`, and `npm run format` all pass.
+
+### Deviations from the plan
+
+1. **Gate + error banner promoted to shared root, not feature-local.** Plan 5b/5d
+   said keep a feature-local gate/banner "until a real second use exists." That
+   second use (location-builder) arrived in the same step, so both were promoted:
+   `src/components/gate/program-gate.tsx` (generic — `skeleton` + `ugandaFallback`
+   slot + `children(programId, permissions)`) and
+   `src/components/error/error-banner.tsx` (generic `ErrorBanner`). The planned
+   `gate/location-program-gate.tsx` and `error/location-builder-error-banner.tsx`
+   were **not** created.
+2. **`ErrorBanner` is built on the shadcn `Alert` primitive** (`ui/alert.tsx`,
+   added via `npx shadcn add alert`), not a hand-rolled div — "use shadcn
+   primitives as much as possible."
+3. **Edit-authority flag dropped.** Plan 4a/5c/5e gated editing on
+   `writeSiteMetadata` (`actorCanEditLevels`). The `(home)` layout already
+   redirects anyone with `privilege !== 3`, and ADR 0001 names **privilege** as
+   the v1 authority tier — so `writeSiteMetadata` was itself a drift from the ADR.
+   Removed it: the **frozen prefix (`hasSites`) is the only structural gate**, and
+   PRD stories 16–17 collapse into the upstream privilege gate. Per-actor
+   permission stays deferred (ADR 0001); re-adding it later is a one-prop change.
+4. **Permissions reach the builder as a single `accessibleSites` prop.** The gate
+   yields `(programId, permissions)`; the page-client passes only
+   `permissions.sites.canAccessSites` → `LocationBuilder.accessibleSites`. No
+   `writeSiteMetadata` threading, no second `useGetUserPermissions` in the builder.
+5. **Occupancy is a boundary index, not a count.** Implemented as
+   `firstLevelWithNoSitesIndex` (the index where the editable tail begins) rather
+   than the plan's `countOccupiedLevels`. Same number, but it reads without jargon
+   at the call sites (`hasSites={index < firstLevelWithNoSitesIndex}`); the per-row
+   flag is `hasSites`, the 1-based display number is `displayPosition`. Inline,
+   single call site — no util.
+6. **The add control is a form, not a row.** `add-level-row.tsx` →
+   `add-location-level-form.tsx` (`AddLocationLevelForm`), built with
+   react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`, backed by a new
+   `validation/add-location-level-form-schema.ts`. Matches the `login-form` /
+   `question-form` precedent.
+7. **Component names carry the `LocationLevel*` prefix** (`LocationLevelList`,
+   `LocationLevelRow`, `AddLocationLevelForm`, `DeleteLocationLevelDialog`),
+   superseding the plan's `LevelList` / `LevelRow` / `delete-level-dialog` names.
+8. **Reorder uses sequential `mutateAsync` + a manual `isReordering` batch flag**
+   (re-entry guard + dim/lock the list while the N PUTs run). Single-shot
+   mutations (rename / add / delete) use the hook's own `isPending`.
+9. **A feature-local `uganda-program-empty-state.tsx` was added** (location
+   wording) and passed into the shared gate's `ugandaFallback` slot — not in the
+   manifest, but required once the gate became wording-agnostic.
+
+### New conventions (carry forward)
+
+- **Shared gate/error live at the root once ≥ 2 features need them.** `ProgramGate`
+  = `(programId, permissions) ⇒ ReactNode` with `skeleton` + `ugandaFallback`
+  slots; `ErrorBanner` is generic and built on shadcn `Alert`.
+- **`(home)` admin edit-authority = the layout's `privilege === 3` gate** (ADR 0001
+  tier), not a per-feature `writeSiteMetadata` check, until an explicit permission
+  exists.
+- **Pending state:** one mutation → the hook's `isPending`; a batched op (N
+  sequential `mutateAsync`) → a local `is…ing` flag set before the loop, cleared in
+  `finally`, driving both the re-entry guard and the UI disable.
+- **Forms = react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`**, with a
+  `<feature>/validation/<name>-form-schema.ts` (UI schema separate from the wire
+  contract). Inline single-field commit-on-blur edits (rename) stay a plain
+  `Input`, not a form.
+- **Name by the data fact / boundary, not the derived concept:**
+  `firstLevelWithNoSitesIndex`, `hasSites`, `displayPosition` — never
+  `occupiedLevelCount` / `isFrozen` / `ordinal`.
+- **Don't prop-drill server state as cherry-picked scalars** — pass the one
+  cohesive value a consumer needs (`accessibleSites`), or read the cached query in
+  the consumer.
+
+## Phase 6 — Route + navigation  ✅ Completed
 
 1. **`src/app/(home)/locations/page.tsx`** — server component rendering a page
    shell + `LocationBuilderPageClient` (mirror `forms/page.tsx`). The `(home)`
@@ -435,7 +589,38 @@ by `isOccupied`, only by `actorCanEditLevels`.
 
 **Checkpoint:** `npm run typecheck && npm run lint`.
 
-## Phase 7 — Manual verification (no automated tests)
+### What was implemented
+
+Three files, each mirroring the `forms` precedent 1:1. No utils, no new types —
+pure wiring.
+
+- **`src/app/(home)/locations/page.tsx`** — `LocationsPage`, a thin server
+  component (no `'use client'`) that renders `LocationBuilderPageShell` wrapping
+  `LocationBuilderPageClient`. Mirrors `forms/page.tsx` line-for-line. No extra
+  gating: the `(home)` layout already enforces auth + whitelist + `privilege ===
+  3`, and the Uganda gate lives inside the page-client's `ProgramGate`.
+- **`src/features/location-builder/components/layout/location-builder-page-shell.tsx`**
+  — `LocationBuilderPageShell`, a single-`children` shell mirroring
+  `FormVersionsPageShell` (same `mx-auto w-full max-w-5xl space-y-8 py-8`
+  container + header). Title "Location hierarchy", description "Define and order
+  the location levels your Program's sites are organized into." (`&apos;`-escaped).
+  `LocationBuilder` renders no header of its own, so the shell owns it.
+- **`src/app/(home)/page.tsx`** — added `<Link href="/locations">Location
+  Builder</Link>` next to the existing Form Builder link.
+
+`npm run typecheck` and `npm run lint` both pass.
+
+### Deviations from the plan
+
+- **Shell named `LocationBuilderPageShell`** (file `location-builder-page-shell.tsx`),
+  not the plan's tentative `location-builder-shell` — matches the `…PageShell`
+  suffix of the `FormVersionsPageShell` precedent. Built standalone (no left
+  rail / Site column); VCV-208 is out of scope, so layout room is left for it
+  rather than scaffolded now.
+- **Nav link ordered before Form Builder** on the home page (cosmetic; the home
+  nav is still unstyled, links rendered bare in a `Fragment` as before).
+
+## Phase 7 — Manual verification (no automated tests)  ⛔ Not started (Phase 6 done — ready to run)
 
 Run the app (`npm run dev`) as a `privilege === 3`, whitelisted, non-Uganda user
 and walk the PRD user stories:
@@ -490,10 +675,9 @@ src/app/api/programs/[programId]/location-types/
 src/app/(home)/locations/page.tsx
 
 src/features/location-builder/
-├── utils/
-│   ├── level-model.ts             # buildLevelModel  (deep module, // see ADR 0001)
-│   ├── reorder-plan.ts            # planReorder      (deep module, // see ADR 0001)
-│   └── level-model.ts            (getNextLevel lives here or alongside)
+├── utils/                         # created ON DEMAND only (Phase 4): pure fns
+│                                  #   extracted when reused / non-trivial, e.g.
+│                                  #   countOccupiedLevels, planReorder, getNextLevel
 └── components/
     ├── location-builder-page-client.tsx
     ├── gate/location-program-gate.tsx
@@ -518,11 +702,13 @@ Pre-flight backend check ─▶ Phase 1 (contracts)
 Phase 2 (server fns + BFF) ─▶ Phase 3 (keys + hooks)
         │
         ▼
-Phase 4 (pure deep modules — parallelizable, no backend dep)
+Phase 4 (domain logic — implemented inline inside Phase 5)
         │
         ▼
-Phase 5 (feature UI) ─▶ Phase 6 (route + nav) ─▶ Phase 7 (manual verify)
+Phase 5 (feature UI, inside-out) ─▶ Phase 6 (route + nav) ─▶ Phase 7 (verify)
 ```
 
-Phase 4 has no dependency on Phases 1–3 except the `LocationType` / `Site`
-types, so it can proceed in parallel once Phase 1 lands.
+Phase 4 is no longer a standalone module-building step: its logic is written
+inline as Phase 5 is built, and any pure utility is extracted only once it earns
+its keep (reused or non-trivial). It depends only on the `LocationType` / `Site`
+contract types from Phase 1.

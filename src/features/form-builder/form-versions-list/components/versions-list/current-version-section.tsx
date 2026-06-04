@@ -2,7 +2,7 @@
 
 import { useGetCurrentFormByProgramId } from '@/api/form/hooks/use-get-current-form-by-program-id';
 import VersionsSection from './versions-section';
-import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
+import ErrorBanner from '@/components/error/error-banner';
 import { format } from 'date-fns';
 import NoCurrentFormEmptyState from '../empty-state/no-current-form-empty-state';
 import Link from 'next/link';
@@ -44,7 +44,7 @@ export default function CurrentVersionSection({
         } else {
             return (
                 <VersionsSection label="Current version">
-                    <FormBuilderErrorBanner
+                    <ErrorBanner
                         title="Couldn't load the current version"
                         error={
                             getCurrentFormByProgramIdResult.error ?? {

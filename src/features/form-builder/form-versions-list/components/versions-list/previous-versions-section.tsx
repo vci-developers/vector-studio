@@ -2,7 +2,7 @@
 
 import { useGetCurrentFormByProgramId } from '@/api/form/hooks/use-get-current-form-by-program-id';
 import VersionsSection from './versions-section';
-import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
+import ErrorBanner from '@/components/error/error-banner';
 import { useGetFormsByProgramId } from '@/api/form/hooks/use-get-forms-by-program-id';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
@@ -37,7 +37,7 @@ export default function PreviousVersionsSection({
     if (!getFormsByProgramIdResult.ok) {
         return (
             <VersionsSection label="Previously published">
-                <FormBuilderErrorBanner
+                <ErrorBanner
                     title="Couldn't load published versions"
                     error={getFormsByProgramIdResult.error}
                     onRetry={() => {
