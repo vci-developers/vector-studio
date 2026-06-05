@@ -38,8 +38,8 @@ assumes their domain language and invariants.
 - **Build incrementally, inside-out.** Write component logic inline first. Do
   **not** pre-create utility modules or a standalone "deep modules" layer. Reach
   for `src/features/location-builder/utils/` only once a piece of logic is
-  actually reused (≥ 2 call sites) or hides genuinely non-trivial logic — and add
-  it then, not before.
+  actually reused (≥ 2 call sites) or hides genuinely non-trivial logic — and
+  add it then, not before.
 - **Minimal, true utilities only.** An extracted utility is a **pure** function:
   no React/JSX, no component state, no side effects, no UI-shaped output
   (capability flags, view-model rows). If it leans on a component concern it
@@ -103,29 +103,34 @@ Five contract files under `src/api/location-type/contracts/`:
 
 - `location-type-schema.ts` — `locationTypeSchema` + `LocationType`
   (`{ id, programId, name, level }`).
-- `get-location-types-by-program-id-schema.ts` — `{ locationTypes:
-  z.array(locationTypeSchema) }` + response/SuccessPayload types.
+- `get-location-types-by-program-id-schema.ts` —
+  `{ locationTypes: z.array(locationTypeSchema) }` + response/SuccessPayload
+  types.
 - `post-location-type-to-program-schema.ts` — request `{ name: min(1), level }`,
   response `{ message, locationType }` + request/response/SuccessPayload types.
-- `put-location-type-by-program-id-schema.ts` — `{ name: min(1), level }.partial()`
-  request, `{ message, locationType }` response + types.
-- `delete-location-type-from-program-schema.ts` — `{ message }` response + types.
+- `put-location-type-by-program-id-schema.ts` —
+  `{ name: min(1), level }.partial()` request, `{ message, locationType }`
+  response + types.
+- `delete-location-type-from-program-schema.ts` — `{ message }` response +
+  types.
 
 `npm run typecheck` passes.
 
 ### Deviations from the plan
 
 - **Verbose endpoint filenames** replace the shorthand listed in steps 2–5
-  (`get-location-types-by-program-id-schema`, `post-location-type-to-program-schema`,
-  `put-location-type-by-program-id-schema`, `delete-location-type-from-program-schema`).
-  This applies the `feedback_form_schema_conventions` memory (verbose names
-  matching the closest precedent) and supersedes the manifest names.
-- **PUT request uses `.partial()`** on the `{ name, level }` base rather than the
-  per-field `.optional()` written in step 4 — same resulting type, but honors the
-  memory's "PUT schemas use `.partial()`" convention.
+  (`get-location-types-by-program-id-schema`,
+  `post-location-type-to-program-schema`,
+  `put-location-type-by-program-id-schema`,
+  `delete-location-type-from-program-schema`). This applies the
+  `feedback_form_schema_conventions` memory (verbose names matching the closest
+  precedent) and supersedes the manifest names.
+- **PUT request uses `.partial()`** on the `{ name, level }` base rather than
+  the per-field `.optional()` written in step 4 — same resulting type, but
+  honors the memory's "PUT schemas use `.partial()`" convention.
 - **Resource id field is `id`** (matching `user-profile` / `annotation-task`
-  precedent and the plan's step-1 shape), not the `locationTypeId` floated during
-  drafting. Still pending the backend pre-flight check (field names).
+  precedent and the plan's step-1 shape), not the `locationTypeId` floated
+  during drafting. Still pending the backend pre-flight check (field names).
 
 ### Outstanding
 
@@ -176,8 +181,8 @@ Server functions (filename = contract filename minus `-schema`, name matches):
   `getLocationTypesByProgramId(accessToken, programId)`. No-body `GET` to
   `/programs/${programId}/location-types`. Mirrors `getFormsByProgramId`.
 - `post-location-type-to-program.ts` —
-  `postLocationTypeToProgram(accessToken, programId, requestBody)`.
-  `safeParse` → `err({ kind: 'client' })` guard, then `POST`. Mirrors
+  `postLocationTypeToProgram(accessToken, programId, requestBody)`. `safeParse`
+  → `err({ kind: 'client' })` guard, then `POST`. Mirrors
   `postQuestionToDraftForm`.
 - `put-location-type-by-program-id.ts` —
   `putLocationTypeByProgramId(accessToken, programId, locationTypeId, requestBody)`.
@@ -268,17 +273,16 @@ just invalidate the Location Type key. Model on
 One keys factory and four hooks under `src/api/location-type/`, each mirroring
 the closest `form` / `form-question` precedent line-for-line.
 
-- `location-type-keys.ts` — `locationTypeKeys` with
-  `root: ['location-types']` and
-  `locationTypesByProgramId(programId) => ['location-types', programId]`.
+- `location-type-keys.ts` — `locationTypeKeys` with `root: ['location-types']`
+  and `locationTypesByProgramId(programId) => ['location-types', programId]`.
   Mirrors `form-keys.ts`; the scoped method name mirrors the server function
   (`getLocationTypesByProgramId` → `locationTypesByProgramId`, exactly as
   `formsByProgramId`).
 - `hooks/use-get-location-types-by-program-id.ts` —
   `useGetLocationTypesByProgramId(programId, options?)`. Extracted
-  `fetchLocationTypesByProgramId` `GET`s `/api/programs/${programId}/location-types`
-  with `credentials: 'include'`; query key
-  `locationTypeKeys.locationTypesByProgramId(programId)`. Mirrors
+  `fetchLocationTypesByProgramId` `GET`s
+  `/api/programs/${programId}/location-types` with `credentials: 'include'`;
+  query key `locationTypeKeys.locationTypesByProgramId(programId)`. Mirrors
   `useGetFormsByProgramId` (`…QueryResult` / `…QueryOptions` types, no schema
   re-validation).
 - `hooks/use-post-location-type-to-program.ts` —
@@ -295,19 +299,20 @@ the closest `form` / `form-question` precedent line-for-line.
   invalidation. Mirrors `usePutQuestionToDraftForm`.
 - `hooks/use-delete-location-type-from-program.ts` —
   `useDeleteLocationTypeFromProgram()`. Variables
-  `{ programId, locationTypeId }`; helper `removeLocationTypeFromProgram`.
-  Same guarded invalidation. Mirrors `useDeleteQuestionFromDraftForm`.
+  `{ programId, locationTypeId }`; helper `removeLocationTypeFromProgram`. Same
+  guarded invalidation. Mirrors `useDeleteQuestionFromDraftForm`.
 
 All four mutations invalidate **only** the Location Type key — never
 user-permissions — since Levels don't change Site occupancy (per ADR 0001 / the
 note above). Mutation hooks expose no `options` parameter; callers attach
 toast/dialog behavior per-call via `mutate(vars, { onSuccess })`, matching the
-established convention. Same-module imports are relative (`../location-type-keys`,
-`../contracts/…`) exactly as `use-get-forms-by-program-id.ts` imports
-`../form-keys`; `Result` / `NetworkError` stay absolute (`@/lib/…`).
+established convention. Same-module imports are relative
+(`../location-type-keys`, `../contracts/…`) exactly as
+`use-get-forms-by-program-id.ts` imports `../form-keys`; `Result` /
+`NetworkError` stay absolute (`@/lib/…`).
 
-`npm run typecheck`, `npm run lint`, and `npx prettier --check src/api/location-type/**`
-all pass.
+`npm run typecheck`, `npm run lint`, and
+`npx prettier --check src/api/location-type/**` all pass.
 
 ### Deviations from the plan
 
@@ -319,9 +324,9 @@ all pass.
   bottom of this document.
 - **PUT hook file renamed** from the initially-created
   `use-put-location-type-by-id.ts` to `use-put-location-type-by-program-id.ts`,
-  so the filename is the exact kebab of its export (`usePutLocationTypeByProgramId`)
-  and mirrors its sibling server fn / contract — matching the codebase rule that
-  every hook file name equals its export name.
+  so the filename is the exact kebab of its export
+  (`usePutLocationTypeByProgramId`) and mirrors its sibling server fn / contract
+  — matching the codebase rule that every hook file name equals its export name.
 
 ## Phase 4 — Domain logic the builder needs (implement inline; extract on demand) ✅ Completed
 
@@ -341,8 +346,8 @@ output, no manufactured intermediate types). Work directly off the existing
   shown in the UI is just the sorted index `+ 1` — no helper.
 - Occupancy `k`: from `canAccessSites`, collect the set of referenced
   `locationTypeId`s, then walk the level-sorted list and count the contiguous
-  occupied **prefix** (stop at the first Level with no Site, tolerating gaps). By
-  the contiguous-top-prefix invariant the occupied Levels are `[1..k]`; the
+  occupied **prefix** (stop at the first Level with no Site, tolerating gaps).
+  By the contiguous-top-prefix invariant the occupied Levels are `[1..k]`; the
   editable tail is `[k+1..n]`.
 - A Level is frozen (no reorder, no delete, no insert-among) when its sorted
   index `< k`. **Rename is always allowed** (safe — backend propagates). Editing
@@ -379,20 +384,22 @@ output, no manufactured intermediate types). Work directly off the existing
 
 ### What was implemented
 
-All three pieces live **inline** in the Phase 5 components — **no `utils/` folder,
-zero feature utilities**. Each derivation has a single call site, so none met the
-"reused ≥ 2 sites" bar; the plan's extraction candidates (`countOccupiedLevels`,
-`planReorder`, `getNextLevel`) were all kept inline.
+All three pieces live **inline** in the Phase 5 components — **no `utils/`
+folder, zero feature utilities**. Each derivation has a single call site, so
+none met the "reused ≥ 2 sites" bar; the plan's extraction candidates
+(`countOccupiedLevels`, `planReorder`, `getNextLevel`) were all kept inline.
 
 - **Sort** — `locationTypesSortedByLevel` (`useMemo`) in `location-builder.tsx`.
 - **Occupancy** — computed in `location-builder.tsx` as a **boundary index**,
-  `firstLevelWithNoSitesIndex` (length of the contiguous occupied prefix), passed
-  down once. The per-row flag is `hasSites = index < firstLevelWithNoSitesIndex`.
-  See Phase 5 Deviation 5 for the naming rationale (boundary index, not a count).
-- **Reorder planning** — inline in `LocationLevelList.handleReorder`; the minimal
-  set is a bare `Array<{ id; level }>` (`updatedLocationLevels`), no intermediate
-  type, mirroring `swapAdjacentSiblings`.
-- **Next level** — inline in `AddLocationLevelForm` (`max(level) + 1`, else `1`).
+  `firstLevelWithNoSitesIndex` (length of the contiguous occupied prefix),
+  passed down once. The per-row flag is
+  `hasSites = index < firstLevelWithNoSitesIndex`. See Phase 5 Deviation 5 for
+  the naming rationale (boundary index, not a count).
+- **Reorder planning** — inline in `LocationLevelList.handleReorder`; the
+  minimal set is a bare `Array<{ id; level }>` (`updatedLocationLevels`), no
+  intermediate type, mirroring `swapAdjacentSiblings`.
+- **Next level** — inline in `AddLocationLevelForm` (`max(level) + 1`, else
+  `1`).
 
 ## Phase 5 — Feature UI: Location Builder ✅ Completed
 
@@ -402,9 +409,10 @@ cloud-console (Linear-status / Airtable-field idiom), **not** DHIS2
 tree-outline, **not** node-graph (see `feedback_ui_aesthetic` + PRD).
 
 Build the components **inside-out with the Phase 4 logic inline** (sort,
-occupied-prefix count, reorder updates, next level), memoized in the orchestrator
-and handlers. Extract a pure utility under `utils/` **only** once the same logic
-is duplicated or grows non-trivial — see the Implementation rules above.
+occupied-prefix count, reorder updates, next level), memoized in the
+orchestrator and handlers. Extract a pure utility under `utils/` **only** once
+the same logic is duplicated or grows non-trivial — see the Implementation rules
+above.
 
 ### 5a. Add the DnD dependency
 
@@ -437,9 +445,9 @@ builds clean. (Only new dependency in this work.)
    level-sorted Location Types top-to-bottom (Level 1 at top), with a
    `+ Add level` affordance pinned at the bottom. On drag-end: map to
    `(fromIndex, toIndex)`, compute the minimal `{ id, level }` updates inline
-   (Phase 4b), then fire one `usePutLocationTypeByProgramId` mutation per update;
-   toast on completion; invalidation refreshes the list. Frozen-prefix rows are
-   not draggable and reject drops among them.
+   (Phase 4b), then fire one `usePutLocationTypeByProgramId` mutation per
+   update; toast on completion; invalidation refreshes the list. Frozen-prefix
+   rows are not draggable and reject drops among them.
 5. **`components/builder/level-row.tsx`** — single row: drag handle (disabled +
    hidden/greyed for occupied rows), inline rename `Input` (commit on blur/Enter
    → `usePutLocationTypeByProgramId` with `{ name }`), ordinal + name display,
@@ -501,51 +509,56 @@ src/components/ui/alert.tsx                     # npx shadcn add alert
 ```
 
 Deleted: `src/features/form-builder/components/gate/program-gate.tsx`,
-`…/components/error/form-builder-error-banner.tsx`. Form-builder's 3 page-clients
-and 5 error-banner consumers were migrated to the shared components.
+`…/components/error/form-builder-error-banner.tsx`. Form-builder's 3
+page-clients and 5 error-banner consumers were migrated to the shared
+components.
 
 `npm run typecheck`, `npm run lint`, and `npm run format` all pass.
 
 ### Deviations from the plan
 
-1. **Gate + error banner promoted to shared root, not feature-local.** Plan 5b/5d
-   said keep a feature-local gate/banner "until a real second use exists." That
-   second use (location-builder) arrived in the same step, so both were promoted:
-   `src/components/gate/program-gate.tsx` (generic — `skeleton` + `ugandaFallback`
-   slot + `children(programId, permissions)`) and
+1. **Gate + error banner promoted to shared root, not feature-local.** Plan
+   5b/5d said keep a feature-local gate/banner "until a real second use exists."
+   That second use (location-builder) arrived in the same step, so both were
+   promoted: `src/components/gate/program-gate.tsx` (generic — `skeleton` +
+   `ugandaFallback` slot + `children(programId, permissions)`) and
    `src/components/error/error-banner.tsx` (generic `ErrorBanner`). The planned
-   `gate/location-program-gate.tsx` and `error/location-builder-error-banner.tsx`
-   were **not** created.
+   `gate/location-program-gate.tsx` and
+   `error/location-builder-error-banner.tsx` were **not** created.
 2. **`ErrorBanner` is built on the shadcn `Alert` primitive** (`ui/alert.tsx`,
    added via `npx shadcn add alert`), not a hand-rolled div — "use shadcn
    primitives as much as possible."
 3. **Edit-authority flag dropped.** Plan 4a/5c/5e gated editing on
    `writeSiteMetadata` (`actorCanEditLevels`). The `(home)` layout already
    redirects anyone with `privilege !== 3`, and ADR 0001 names **privilege** as
-   the v1 authority tier — so `writeSiteMetadata` was itself a drift from the ADR.
-   Removed it: the **frozen prefix (`hasSites`) is the only structural gate**, and
-   PRD stories 16–17 collapse into the upstream privilege gate. Per-actor
-   permission stays deferred (ADR 0001); re-adding it later is a one-prop change.
-4. **Permissions reach the builder as a single `accessibleSites` prop.** The gate
-   yields `(programId, permissions)`; the page-client passes only
+   the v1 authority tier — so `writeSiteMetadata` was itself a drift from the
+   ADR. Removed it: the **frozen prefix (`hasSites`) is the only structural
+   gate**, and PRD stories 16–17 collapse into the upstream privilege gate.
+   Per-actor permission stays deferred (ADR 0001); re-adding it later is a
+   one-prop change.
+4. **Permissions reach the builder as a single `accessibleSites` prop.** The
+   gate yields `(programId, permissions)`; the page-client passes only
    `permissions.sites.canAccessSites` → `LocationBuilder.accessibleSites`. No
-   `writeSiteMetadata` threading, no second `useGetUserPermissions` in the builder.
+   `writeSiteMetadata` threading, no second `useGetUserPermissions` in the
+   builder.
 5. **Occupancy is a boundary index, not a count.** Implemented as
-   `firstLevelWithNoSitesIndex` (the index where the editable tail begins) rather
-   than the plan's `countOccupiedLevels`. Same number, but it reads without jargon
-   at the call sites (`hasSites={index < firstLevelWithNoSitesIndex}`); the per-row
-   flag is `hasSites`, the 1-based display number is `displayPosition`. Inline,
-   single call site — no util.
+   `firstLevelWithNoSitesIndex` (the index where the editable tail begins)
+   rather than the plan's `countOccupiedLevels`. Same number, but it reads
+   without jargon at the call sites
+   (`hasSites={index < firstLevelWithNoSitesIndex}`); the per-row flag is
+   `hasSites`, the 1-based display number is `displayPosition`. Inline, single
+   call site — no util.
 6. **The add control is a form, not a row.** `add-level-row.tsx` →
    `add-location-level-form.tsx` (`AddLocationLevelForm`), built with
-   react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`, backed by a new
-   `validation/add-location-level-form-schema.ts`. Matches the `login-form` /
-   `question-form` precedent.
+   react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`, backed by a
+   new `validation/add-location-level-form-schema.ts`. Matches the `login-form`
+   / `question-form` precedent.
 7. **Component names carry the `LocationLevel*` prefix** (`LocationLevelList`,
    `LocationLevelRow`, `AddLocationLevelForm`, `DeleteLocationLevelDialog`),
-   superseding the plan's `LevelList` / `LevelRow` / `delete-level-dialog` names.
-8. **Reorder uses sequential `mutateAsync` + a manual `isReordering` batch flag**
-   (re-entry guard + dim/lock the list while the N PUTs run). Single-shot
+   superseding the plan's `LevelList` / `LevelRow` / `delete-level-dialog`
+   names.
+8. **Reorder uses sequential `mutateAsync` + a manual `isReordering` batch
+   flag** (re-entry guard + dim/lock the list while the N PUTs run). Single-shot
    mutations (rename / add / delete) use the hook's own `isPending`.
 9. **A feature-local `uganda-program-empty-state.tsx` was added** (location
    wording) and passed into the shared gate's `ugandaFallback` slot — not in the
@@ -553,27 +566,27 @@ and 5 error-banner consumers were migrated to the shared components.
 
 ### New conventions (carry forward)
 
-- **Shared gate/error live at the root once ≥ 2 features need them.** `ProgramGate`
-  = `(programId, permissions) ⇒ ReactNode` with `skeleton` + `ugandaFallback`
-  slots; `ErrorBanner` is generic and built on shadcn `Alert`.
-- **`(home)` admin edit-authority = the layout's `privilege === 3` gate** (ADR 0001
-  tier), not a per-feature `writeSiteMetadata` check, until an explicit permission
-  exists.
+- **Shared gate/error live at the root once ≥ 2 features need them.**
+  `ProgramGate` = `(programId, permissions) ⇒ ReactNode` with `skeleton` +
+  `ugandaFallback` slots; `ErrorBanner` is generic and built on shadcn `Alert`.
+- **`(home)` admin edit-authority = the layout's `privilege === 3` gate** (ADR
+  0001 tier), not a per-feature `writeSiteMetadata` check, until an explicit
+  permission exists.
 - **Pending state:** one mutation → the hook's `isPending`; a batched op (N
-  sequential `mutateAsync`) → a local `is…ing` flag set before the loop, cleared in
-  `finally`, driving both the re-entry guard and the UI disable.
-- **Forms = react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`**, with a
-  `<feature>/validation/<name>-form-schema.ts` (UI schema separate from the wire
-  contract). Inline single-field commit-on-blur edits (rename) stay a plain
-  `Input`, not a form.
+  sequential `mutateAsync`) → a local `is…ing` flag set before the loop, cleared
+  in `finally`, driving both the re-entry guard and the UI disable.
+- **Forms = react-hook-form + `zodResolver` + shadcn `Field`/`FieldError`**,
+  with a `<feature>/validation/<name>-form-schema.ts` (UI schema separate from
+  the wire contract). Inline single-field commit-on-blur edits (rename) stay a
+  plain `Input`, not a form.
 - **Name by the data fact / boundary, not the derived concept:**
   `firstLevelWithNoSitesIndex`, `hasSites`, `displayPosition` — never
   `occupiedLevelCount` / `isFrozen` / `ordinal`.
 - **Don't prop-drill server state as cherry-picked scalars** — pass the one
-  cohesive value a consumer needs (`accessibleSites`), or read the cached query in
-  the consumer.
+  cohesive value a consumer needs (`accessibleSites`), or read the cached query
+  in the consumer.
 
-## Phase 6 — Route + navigation  ✅ Completed
+## Phase 6 — Route + navigation ✅ Completed
 
 1. **`src/app/(home)/locations/page.tsx`** — server component rendering a page
    shell + `LocationBuilderPageClient` (mirror `forms/page.tsx`). The `(home)`
@@ -597,30 +610,34 @@ pure wiring.
 - **`src/app/(home)/locations/page.tsx`** — `LocationsPage`, a thin server
   component (no `'use client'`) that renders `LocationBuilderPageShell` wrapping
   `LocationBuilderPageClient`. Mirrors `forms/page.tsx` line-for-line. No extra
-  gating: the `(home)` layout already enforces auth + whitelist + `privilege ===
-  3`, and the Uganda gate lives inside the page-client's `ProgramGate`.
+  gating: the `(home)` layout already enforces auth + whitelist +
+  `privilege === 3`, and the Uganda gate lives inside the page-client's
+  `ProgramGate`.
 - **`src/features/location-builder/components/layout/location-builder-page-shell.tsx`**
   — `LocationBuilderPageShell`, a single-`children` shell mirroring
   `FormVersionsPageShell` (same `mx-auto w-full max-w-5xl space-y-8 py-8`
   container + header). Title "Location hierarchy", description "Define and order
-  the location levels your Program's sites are organized into." (`&apos;`-escaped).
-  `LocationBuilder` renders no header of its own, so the shell owns it.
-- **`src/app/(home)/page.tsx`** — added `<Link href="/locations">Location
-  Builder</Link>` next to the existing Form Builder link.
+  the location levels your Program's sites are organized into."
+  (`&apos;`-escaped). `LocationBuilder` renders no header of its own, so the
+  shell owns it.
+- **`src/app/(home)/page.tsx`** — added
+  `<Link href="/locations">Location Builder</Link>` next to the existing Form
+  Builder link.
 
 `npm run typecheck` and `npm run lint` both pass.
 
 ### Deviations from the plan
 
-- **Shell named `LocationBuilderPageShell`** (file `location-builder-page-shell.tsx`),
-  not the plan's tentative `location-builder-shell` — matches the `…PageShell`
-  suffix of the `FormVersionsPageShell` precedent. Built standalone (no left
-  rail / Site column); VCV-208 is out of scope, so layout room is left for it
-  rather than scaffolded now.
+- **Shell named `LocationBuilderPageShell`** (file
+  `location-builder-page-shell.tsx`), not the plan's tentative
+  `location-builder-shell` — matches the `…PageShell` suffix of the
+  `FormVersionsPageShell` precedent. Built standalone (no left rail / Site
+  column); VCV-208 is out of scope, so layout room is left for it rather than
+  scaffolded now.
 - **Nav link ordered before Form Builder** on the home page (cosmetic; the home
   nav is still unstyled, links rendered bare in a `Fragment` as before).
 
-## Phase 7 — Manual verification (no automated tests)  ⛔ Not started (Phase 6 done — ready to run)
+## Phase 7 — Manual verification (no automated tests) ⛔ Not started (Phase 6 done — ready to run)
 
 Run the app (`npm run dev`) as a `privilege === 3`, whitelisted, non-Uganda user
 and walk the PRD user stories:

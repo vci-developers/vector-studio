@@ -6,10 +6,10 @@ accepted
 
 ## Applies to
 
-The Location Hierarchy Builder — specifically the Location Type
-reorder/delete logic and the level-model occupancy guard (the "frozen
-top-prefix" rule). Look for `// see ADR 0001` at the reorder planner and the
-reorder/delete gating in the level model builder.
+The Location Hierarchy Builder — specifically the Location Type reorder/delete
+logic and the level-model occupancy guard (the "frozen top-prefix" rule). Look
+for `// see ADR 0001` at the reorder planner and the reorder/delete gating in
+the level model builder.
 
 ## Context & Decision
 
@@ -28,8 +28,8 @@ We therefore enforce reorder safety entirely on the frontend, on two pillars:
    (no reorder, no insert-among, no delete) and only allows structural edits in
    the empty tail `[k+1..n]`. Occupancy is derived from `canAccessSites`.
 2. **Authority by tier.** Editing global Levels is reserved for a Location-type
-   admin; Site managers may only touch Sites within their accessible subtree
-   and never reorder Levels. Today this is gated on the user `privilege` number
+   admin; Site managers may only touch Sites within their accessible subtree and
+   never reorder Levels. Today this is gated on the user `privilege` number
    (every `(home)` user is `privilege === 3`); the intended replacement is an
    explicit permission.
 
@@ -49,5 +49,5 @@ We therefore enforce reorder safety entirely on the frontend, on two pillars:
   Accepted for v1; the airtight fix (backend guard or confirmed full visibility)
   is deferred. Delete is unaffected — the backend block backstops it.
 - `level` is treated as a **sort key, not a contiguous sequence**: deletes leave
-  gaps (backend does not renumber), so the UI always sorts by `level` and reasons
-  about adjacency by sorted position, never `level - 1`.
+  gaps (backend does not renumber), so the UI always sorts by `level` and
+  reasons about adjacency by sorted position, never `level - 1`.

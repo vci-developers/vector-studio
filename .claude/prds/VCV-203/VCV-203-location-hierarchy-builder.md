@@ -133,15 +133,16 @@ these operations (see ADR 0001).
     - item route keyed by location type id → `PUT` (rename/reorder), `DELETE`
 - **Level ordering & occupancy logic** — sort-by-`level`, gap tolerance, and the
   frozen-prefix occupancy (`[1..k]`) that gates reorder/delete/insert. Built
-  **inline in the builder first** (no pre-defined "model" type or capability-flag
-  view-model); the occupied-prefix count is extracted to a small pure function
-  (`countOccupiedLevels`) only once it is reused across rendering and reorder.
+  **inline in the builder first** (no pre-defined "model" type or
+  capability-flag view-model); the occupied-prefix count is extracted to a small
+  pure function (`countOccupiedLevels`) only once it is reused across rendering
+  and reorder.
 - **Reorder planning logic** — maps `(fromPosition, toPosition)` over the sorted
-  list to the minimal set of `{ id, level }` updates the client must `PUT`,
-  with a frozen-prefix no-op guard (ADR 0001). Implemented inline in the
-  drag-end handler; extracted to a pure `planReorder(...)` only if it grows
-  non-trivial. The builder issues one `PUT` per changed row, then invalidates
-  the Location Type keys.
+  list to the minimal set of `{ id, level }` updates the client must `PUT`, with
+  a frozen-prefix no-op guard (ADR 0001). Implemented inline in the drag-end
+  handler; extracted to a pure `planReorder(...)` only if it grows non-trivial.
+  The builder issues one `PUT` per changed row, then invalidates the Location
+  Type keys.
 - **Location Builder feature + `/locations` route** — a new feature module and
   page that derive `programId` from the session (no `programId` in the page
   URL), apply the Uganda + `writeSiteMetadata` gate, and compose the Level list
