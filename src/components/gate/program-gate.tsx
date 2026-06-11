@@ -1,18 +1,27 @@
 'use client';
 
+import type { UserPermissions } from '@/api/user/contracts/user-permissions-schema';
 import { useGetUserPermissions } from '@/api/user/hooks/use-get-user-permissions';
-import FormBuilderErrorBanner from '../error/form-builder-error-banner';
-import UgandaProgramEmptyState from '../empty-state/uganda-program-empty-state';
+import ErrorBanner from '../error/error-banner';
 
-// TODO: This is the seeded legacy form structure. Remove this gate once it migrates.
+// TODO: The legacy Uganda program uses the seeded flat schema. Remove this gate
+// once it migrates.
 const UGANDA_PROGRAM_ID = 1;
 
 interface ProgramGateProps {
     skeleton: React.ReactNode;
-    children: (programId: number) => React.ReactNode;
+    ugandaFallback: React.ReactNode;
+    children: (
+        programId: number,
+        permissions: UserPermissions,
+    ) => React.ReactNode;
 }
 
-export default function ProgramGate({ skeleton, children }: ProgramGateProps) {
+export default function ProgramGate({
+    skeleton,
+    ugandaFallback,
+    children,
+}: ProgramGateProps) {
     const {
         data: getUserPermissionsResult,
         isPending: isGetUserPermissionsPending,
@@ -25,21 +34,19 @@ export default function ProgramGate({ skeleton, children }: ProgramGateProps) {
 
     if (!getUserPermissionsResult.ok) {
         return (
-            <FormBuilderErrorBanner
+            <ErrorBanner
                 title="We couldn't load your permissions"
                 error={getUserPermissionsResult.error}
-                onRetry={() => {
-                    void refetchUserPermissions();
-                }}
+                onRetry={refetchUserPermissions}
             />
         );
     }
 
-    const { programId } = getUserPermissionsResult.data;
+    const { programId, permissions } = getUserPermissionsResult.data;
 
     if (programId === UGANDA_PROGRAM_ID) {
-        return <UgandaProgramEmptyState />;
+        return ugandaFallback;
     }
 
-    return children(programId);
+    return children(programId, permissions);
 }

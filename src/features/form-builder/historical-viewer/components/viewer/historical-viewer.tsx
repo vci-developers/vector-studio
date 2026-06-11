@@ -5,7 +5,7 @@ import { useGetProgramFormByVersion } from '@/api/form/hooks/use-get-program-for
 import { useMemo, useState } from 'react';
 import { computeFormVersionDiff } from '../../../utils/form-version-diff';
 import HistoricalViewerSkeleton from '../loading/historical-viewer-skeleton';
-import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
+import ErrorBanner from '@/components/error/error-banner';
 import DiffSummary from '../../../components/diff/diff-summary';
 import DiffQuestionList from '../../../components/diff/diff-question-list';
 import CheckoutConfirmDialog from '../checkout/checkout-confirm-dialog';
@@ -57,7 +57,7 @@ export default function HistoricalViewer({
 
     if (!getProgramFormByVersionResult.ok) {
         return (
-            <FormBuilderErrorBanner
+            <ErrorBanner
                 title={`Couldn't load version ${version}`}
                 error={getProgramFormByVersionResult.error}
                 onRetry={() => {
@@ -69,7 +69,7 @@ export default function HistoricalViewer({
 
     if (!getDraftFormByProgramIdResult.ok) {
         return (
-            <FormBuilderErrorBanner
+            <ErrorBanner
                 title="Couldn't load the draft to compare against"
                 error={getDraftFormByProgramIdResult.error}
                 onRetry={() => {

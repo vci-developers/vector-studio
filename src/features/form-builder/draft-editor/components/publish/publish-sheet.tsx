@@ -26,7 +26,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { computeFormVersionDiff } from '../../../utils/form-version-diff';
-import FormBuilderErrorBanner from '../../../components/error/form-builder-error-banner';
+import ErrorBanner from '@/components/error/error-banner';
 import DiffQuestionList from '../../../components/diff/diff-question-list';
 import DiffSummary from '../../../components/diff/diff-summary';
 import PublishDiffSkeleton from '../loading/publish-diff-skeleton';
@@ -157,7 +157,7 @@ export default function PublishSheet({
                         <PublishDiffSkeleton />
                     ) : hasUnexpectedCurrentFormError &&
                       !getCurrentPublishedFormResult.ok ? (
-                        <FormBuilderErrorBanner
+                        <ErrorBanner
                             title="Couldn't load the current published version"
                             error={getCurrentPublishedFormResult.error}
                             onRetry={() => {
