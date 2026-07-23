@@ -140,6 +140,15 @@ identity fields — the mobile app guarantees distinct units within one Session.
 **Session Units exist only under Dynamic Form programs** (Surveillance/legacy
 programs have none). _Avoid_: sub-session, repeat, group.
 
+**UI language: a Session Unit is surfaced to admins as a "collection".** Because
+"unit" reads as jargon, all user-facing text calls it a **collection** (e.g.
+"Per-collection questions", "answered again for each collection — each trap,
+room, or HLC hour"). This is **presentation-only**: **code, schemas, query
+params, and this glossary keep `Session Unit` / `unit` / `SESSION_UNIT` /
+`isUnitIdentityComponent`**. Rule of thumb — `collection` appears **only inside a
+user-facing string literal**; identifiers never use it. Every downstream step
+follows the split: the screen says "collection", the code says "unit".
+
 **"order" is overloaded — two distinct fields.** A Session Unit's
 **`unitOrder`** is the _runtime_ sequence in which units were collected within
 one Session (set by mobile, never touched by the builder). A Form Question's

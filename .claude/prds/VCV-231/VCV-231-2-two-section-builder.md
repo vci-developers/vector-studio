@@ -1,5 +1,9 @@
 # VCV-231 · Step 2 — Two-Section Builder & Scope Authoring
 
+> **Status: ✅ DONE (2026-07-23).** `typecheck` / `lint` / `prettier` all clean.
+> See the implementation note at the end for what shipped, deviations, and their
+> downstream impact.
+>
 > Slice 2 of 4. See [Step 0](./VCV-231-0-overview.md). Depends on Step 1
 > (contracts). Assumes `.claude/CONTEXT.md` and ADR 0002.
 
@@ -104,3 +108,82 @@ parent's scope. Reorder swaps only same-scope root siblings.
 
 - Scope immutability means the edit sheet never shows a scope control; the only
   place scope is chosen is the section's Add button.
+
+---
+
+## What was implemented (✅ done)
+
+Verified on disk; `typecheck`, `lint`, and `prettier --check` all pass.
+
+- **`question-order.ts`** — `swapAdjacentSiblings` filters the resolved sibling
+  group to the moved question's `answerScope` before swapping (`indexOf` on the
+  already-found node). Root → same-scope roots; below the root it's a no-op.
+  `getNextQuestionOrder` unchanged (global `max(order)+1`).
+- **`draft-editor.tsx`** — new `answerScopeForNewQuestion` state; the
+  `onAddQuestion` handler stores `(parentId, answerScope)` and threads the scope
+  to the sheet. No tree-walk.
+- **`question-list.tsx`** — renders two `QuestionScopeSection`s; all copy is
+  passed **inline** at the call sites (no per-string constants).
+- **`question-scope-section.tsx`** _(new file)_ — the section component,
+  extracted to its own file. Derives its own scope-filtered, order-sorted roots
+  from `draft`; header + always-visible Add button + light empty-state Card +
+  the unchanged `QuestionCard` list.
+- **`question-form-sheet.tsx`** — inline title/description ternaries (no
+  constants); title is scope-aware for a new root, description is generic.
+- **`question-form.tsx`** — sends `answerScope` on **CREATE only**; edit/PUT
+  omits it (immutable). `isUnitIdentityComponent` not sent (Step 3).
+- **`question-card.tsx`** — `onAddQuestion` now carries the new question's scope;
+  "Add follow-up" passes `question.answerScope` (a follow-up inherits its
+  parent's scope at the source — no lookup).
+- **`no-questions-empty-state.tsx`** — **deleted** (its only consumer was
+  `question-list`; per-section empty states replaced it).
+
+## Deviations from the plan (each justified)
+
+1. **`question-card.tsx` was touched** (the plan reserved it for Step 3). The
+   cleanest data flow has the card pass the parent's `answerScope` it already
+   holds, which removes a tree-walk entirely and makes the callback signature
+   honest (`(parentId, answerScope)`). No Step-3 work (no identity badge) was
+   done here. **Net Step-2 footprint: 6 modified + 1 new + 1 deleted, not 5.**
+2. **Inline UI strings instead of named constants** (plan asked for constants) —
+   per explicit direction; also matches the original sheet's inline pattern. No
+   `collection`/`session` string is duplicated (each appears once at its call
+   site).
+3. **Sheet description is generic, not per-scope** — the section note already
+   explains the scope, so only the sheet **title** is scope-aware. Removed the
+   per-scope description `Record` as over-engineering.
+4. **`QuestionScopeSection` lives in its own file** (`question-scope-section.tsx`)
+   rather than inline in `question-list.tsx`. It is a component, not a util.
+5. **UI language = "collection", code = "unit".** A Session Unit is surfaced to
+   admins as a **collection** ("Per-collection questions", "each collection …");
+   all code/schemas keep `SESSION_UNIT` / `unit` / `isUnitIdentityComponent`.
+   Recorded in `CONTEXT.md` (Forms & Sessions → Session Unit). This is a **new,
+   epic-wide convention**, not a one-off.
+
+## Downstream impact & how to address it
+
+- **Step 3 (identity) builds on an already-scope-aware card.** `onAddQuestion`
+  is now `(parentId: number | null, answerScope: FormQuestionScope) => void` and
+  `FormQuestionScope` is already imported in `question-card.tsx`. The identity
+  badge is additive — no rework, no conflict.
+- **Step 3 & 4 must apply the collection/unit language split.** Every new
+  user-facing string — identity toggle label, publish-gate error, diff/viewer
+  scope headers — uses **"collection"**; the code keeps `isUnitIdentityComponent`
+  / `SESSION_UNIT`. (e.g. surface "This collection needs at least one identifying
+  question", not "unit".) Enforced by the `CONTEXT.md` rule.
+- **Step 0 change map is slightly stale**: Step 2 is 6+1+1, and
+  `no-questions-empty-state.tsx` no longer exists. Update the counts there if you
+  want the map exact; behaviourally nothing else shifts.
+- **Nit — restore the ADR pointer.** The same-scope reorder filter in
+  `question-order.ts` lost its `// see ADR 0002` comment during apply; ADR 0002's
+  "Applies to" section tells readers to look for that marker. Recommend
+  re-adding one line above the `.filter(...)`.
+
+## Testing status
+
+- Manual verification per the plan (add Session + per-collection question, add a
+  follow-up under each and confirm inherited scope, reorder within a section
+  leaving the other untouched) — to be run by the reviewer in `npm run dev` on a
+  Dynamic (non-Uganda) program.
+- The same-scope reorder resolution remains the first unit-test target once a
+  runner exists.

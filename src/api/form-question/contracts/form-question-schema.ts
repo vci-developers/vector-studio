@@ -9,6 +9,8 @@ export const formQuestionTypeSchema = z.enum([
     'date',
 ]);
 
+export const formQuestionScopeSchema = z.enum(['SESSION', 'SESSION_UNIT']);
+
 export const formQuestionSchema = z.object({
     id: z.number(),
     formId: z.number(),
@@ -16,6 +18,8 @@ export const formQuestionSchema = z.object({
     label: z.string(),
     type: formQuestionTypeSchema,
     required: z.boolean(),
+    answerScope: formQuestionScopeSchema.default('SESSION'),
+    isUnitIdentityComponent: z.boolean().default(false),
     options: z.array(z.string()).nullable(),
     order: z.number(),
     prerequisite: prerequisiteExpressionSchema.nullable(),
@@ -27,4 +31,5 @@ export const formQuestionSchema = z.object({
 });
 
 export type FormQuestionType = z.infer<typeof formQuestionTypeSchema>;
+export type FormQuestionScope = z.infer<typeof formQuestionScopeSchema>;
 export type FormQuestion = z.infer<typeof formQuestionSchema>;

@@ -91,3 +91,52 @@ consumer) + `lint` + `format`.
   `isUnitIdentityComponent` (boolean, optional) on the question object and both
   request bodies.
 - Land this first — a later contract correction would ripple through every step.
+
+## What was implemented
+
+Three contract files under `src/api/form-question/contracts/`:
+
+- `form-question-schema.ts` — added `formQuestionScopeSchema`
+  (`z.enum(['SESSION', 'SESSION_UNIT'])`) and the exported `FormQuestionScope`
+  type, plus two fields on `formQuestionSchema` with **response defaults**:
+  `answerScope: formQuestionScopeSchema.default('SESSION')` and
+  `isUnitIdentityComponent: z.boolean().default(false)`. The existing
+  self-referencing `subQuestions` getter propagates both fields to follow-ups
+  automatically, so nested questions round-trip scope/identity with no extra
+  work.
+- `post-question-to-draft-form-schema.ts` — added
+  `answerScope: formQuestionScopeSchema.optional()` and
+  `isUnitIdentityComponent: z.boolean().optional()` to the create request body.
+- `put-question-to-draft-form-schema.ts` — added `answerScope` /
+  `isUnitIdentityComponent` inside the base object (made optional by the
+  existing `.partial()`).
+
+Verified live against `https://test.api.vectorcam.org/documentation/json`:
+`answerScope` (string enum `SESSION`/`SESSION_UNIT`) and
+`isUnitIdentityComponent` (boolean) are both **optional** on the question object
+and on both request bodies — matching this implementation.
+
+**Checkpoint:** `npm run typecheck` clean (the `FormQuestion` change rippled
+through consumers with no errors), `npm run lint` clean, prettier passes on all
+three files. No server/BFF/hook edits were needed (confirmed pass-through).
+
+### Deviations from the plan
+
+- **Response defaults vs. request optional (deliberate asymmetry).** The
+  response schema uses `.default(...)` so every parsed `FormQuestion` carries a
+  defined `answerScope`/`isUnitIdentityComponent` (Steps 2–4 read them without
+  null-checks). The request bodies stay `.optional()` — this mirrors the wire
+  (backend optional) and keeps this slice non-breaking, since the existing
+  `question-form.tsx` create/update construction does not send these fields yet
+  (Steps 2–3 will). This is the crux the plan called for (backward-compat via
+  defaults, no migration).
+- **Enum/type naming: `formQuestionScopeSchema` / `FormQuestionScope`** (not the
+  `formAnswerScopeSchema` / `FormAnswerScope` first drafted). Chosen to mirror
+  the neighboring `formQuestionTypeSchema` precedent. Trade-off noted: the
+  CONTEXT.md glossary term is "Form **Answer** Scope" (field `answerScope`), so
+  `FormAnswerScope` would align with the documented domain noun. Kept
+  `FormQuestionScope` per the local precedent; revisit only if downstream steps
+  read awkwardly.
+- **No `.default()` precedent existed** in the repo's schemas; this introduces
+  the standard Zod idiom, which is the clean way to get the backward-compat
+  behavior.

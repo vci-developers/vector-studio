@@ -1,5 +1,9 @@
 # VCV-231 · Step 4 — Scope & Identity in Diff and Viewer
 
+> **Status: ✅ DONE (2026-07-23).** `typecheck` + `lint` + `prettier --check`
+> all green in-session; reviewer manual pass pending. Final slice of VCV-231 —
+> see the implementation note and **epic closeout** at the end.
+>
 > Slice 4 of 4. See [Step 0](./VCV-231-0-overview.md). Depends on Step 1
 > (contracts); independent of Steps 2–3 at the data level but sequenced last so
 > the diff reflects the finished authoring model. Assumes `.claude/CONTEXT.md`
@@ -98,3 +102,124 @@ handles.
 - The historical viewer wires the same diff components, so this step lights up
   both the version-comparison and the "review before checkout/publish" surfaces
   at once.
+
+---
+
+## What was implemented (✅ done)
+
+Verified on disk; `typecheck`, `lint`, and `prettier --check` on the three
+touched files all pass (run in-session). Exactly the 3 planned files changed.
+
+- **`form-version-diff.ts`** — `isUnitIdentityComponent` added to the
+  `QuestionDiff['fieldChanges']` type and compared in `computeFieldChanges` (a
+  toggle registers as a `modified` field change, flowing into the existing
+  `summary.modified` count — no new diff kind, no summary change). The entry
+  point now **partitions root questions by `answerScope`** and runs
+  `buildSiblingDiffs` once per scope, concatenating into the same flat
+  `questionDiffs` return; `diffSummary` accumulates across both calls.
+- **`diff-question-list.tsx`** — groups the flat `questionDiffs` into two
+  scope sections ("Session questions" / "Per-collection questions", matching the
+  builder's wording in `question-list.tsx`) via a local `resolveDiffScope`
+  reading `answerScope` off each diff's `to ?? from` question. The single
+  from/left · to/right column header stays at the top (orientation preserved);
+  empty sections are filtered out.
+- **`diff-question-cell.tsx`** — a `variant="secondary"` **"Identity"** badge
+  beside the label when `question.isUnitIdentityComponent`; when identity is
+  among the field changes, the badge takes the standard side-appropriate
+  highlight (`bg-destructive/20` left = lost identity, `bg-success/20` right =
+  gained identity), mirroring how `required`/`type` changes are highlighted.
+
+## Deviations from the plan (each justified)
+
+1. **Matcher scope-partitioned at the entry point** (plan said section grouping
+   in the list "is enough — no special-casing"). The similarity matcher is
+   greedy on label/type/position, **not** id-based, so without partitioning a
+   deleted `SESSION` question + a similar added `SESSION_UNIT` question would
+   false-match into a single cross-scope `modified` pair — contradicting
+   immutable scope (ADR 0002) and unrenderable in a scope-grouped layout.
+   Running the matcher once per scope is precisely what makes the plan's stated
+   "a scope move manifests as remove-here + add-there" actually hold. Genuine
+   same-scope pairs match identically to before; an all-`SESSION` baseline
+   behaves exactly as pre-epic (the unit partition is empty on both sides).
+2. **Empty scope sections are filtered out** (not in the plan). A form with only
+   Session questions renders just the "Session questions" header rather than an
+   empty "Per-collection questions" block; the absence reads as "no per-unit
+   changes." Every top-level diff is single-scope (guaranteed by deviation 1),
+   so grouping is unambiguous.
+3. **Inline UI strings, not named constants** — per standing direction and the
+   Step 2–3 precedent. Section titles are inline literals; the only user-facing
+   "collection" text is the section header string. No `SCOPE_SECTION_TITLES`
+   map. Identifiers stay `unit` / `SESSION_UNIT` / `answerScope` /
+   `isUnitIdentityComponent`.
+4. **No inline comments / no `// see ADR 0002` markers** — continues the
+   self-explanatory-code convention from Step 3 (see the stale-ADR note below).
+5. **No util extracted.** `resolveDiffScope` (list) is a two-line pure helper
+   used only within its file; identity detection is one field comparison inside
+   the existing `computeFieldChanges`. Nothing precipitated a `utils/` file.
+   Minor: on apply, `resolveDiffScope` and the pre-existing `describeParentSide`
+   ended up nested inside their component functions rather than at module scope
+   — pure and correct, cosmetic only; left as-is.
+
+## Downstream impact & how to address it
+
+- **The identity-toggle cascade gap (Step 3) is now user-visible in the diff.**
+  The diff faithfully renders each question's **stored** `isUnitIdentityComponent`
+  flag. Because toggling an existing root's identity *off* PUTs only the root,
+  its follow-ups keep `isUnitIdentityComponent: true` in storage — so the diff
+  will show those follow-ups with an "Identity" badge while their root no longer
+  has one. This is a **correct rendering of stored data**, not a Step 4 bug; it
+  makes the carried-over Step 3 cascade gap visible on a new surface. Still needs
+  a decision (cascade the toggle to the subtree, bar toggling-off on a root with
+  follow-ups, or derive identity from the root in review). **Not fixed here** —
+  the fix lives in authoring/review, outside Step 4's 3-file scope.
+- **Diff/viewer needs no further scope/identity work.** Both the publish sheet
+  and the historical viewer consume the unchanged `{ questionDiffs, summary }`
+  shape and `DiffQuestionList` props, so both surfaces were lit up without edits.
+
+## Testing status
+
+- `typecheck` + `lint` + `prettier --check` (three touched files) green,
+  run in-session. No automated tests (no runner).
+- Manual verification to be run by the reviewer on a Dynamic (non-Uganda)
+  program: open the publish sheet on a draft that adds a per-collection question
+  and toggles identity on an existing root → the diff renders two scope sections
+  with correct left/right orientation, an "Identity" badge on identity
+  questions, a side-tinted Identity badge + amber "Modified" on the toggled
+  root, a scope move reads as remove + add, and there is no spurious
+  scope/identity noise against a pre-epic (all-`SESSION`) baseline.
+- First unit-test targets once a runner lands: `computeFieldChanges` (identity
+  as a field change) and the scope-partitioned matching (a cross-scope
+  near-duplicate stays remove + add, never a single `modified`).
+
+---
+
+## Epic closeout (VCV-231 — all 4 slices done)
+
+**File-count reconciliation.** Step 0 predicted **~15 files (14 distinct;
+`question-form.tsx` across steps 2 & 3)**. Actual working-tree total: **17 src
+files** — 15 modified, 1 added, 1 deleted. The +2 over estimate is entirely
+**Step 2's two-section refactor**, neither entry in the Step 0 change map:
+
+- `question-scope-section.tsx` — **new** component extracted for the per-scope
+  section (the map folded this into `question-list.tsx`).
+- `no-questions-empty-state.tsx` — **deleted**; the single-list empty state was
+  replaced by per-section empty-state notes.
+
+Step 4 itself hit **exactly** its 3 predicted files. The "~15" estimate held to
+within +2, both deltas from a reasonable Step 2 componentization.
+
+**Open follow-ups carried past the epic (neither is a VCV-231 code gap):**
+
+1. **Identity-toggle cascade gap** — still undecided; now visible in the diff
+   (see Downstream above). Belongs to authoring/review, not the diff slice.
+   Recommend a small follow-up ticket to pick one of the three remedies.
+2. **Stale ADR-0002 "Applies to"** — it still tells readers to grep for
+   `// see ADR 0002` markers that the no-comments convention intentionally omits
+   (flagged since Step 3; Step 4 kept the convention). Recommend updating the
+   ADR's "Applies to" to point at the identity/scope derivation, the
+   prerequisite filter, the publish gate, and now the diff by **location**, and
+   syncing the recorded ADR-conventions memory — a docs edit, done when you're
+   ready, not a code change.
+
+No domain decision shifted in Step 4 (read-only rendering), so `CONTEXT.md` is
+unchanged.

@@ -1,6 +1,9 @@
 'use client';
 
-import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
+import type {
+    FormQuestion,
+    FormQuestionScope,
+} from '@/api/form-question/contracts/form-question-schema';
 import { usePutQuestionToDraftForm } from '@/api/form-question/hooks/use-put-question-to-draft-form';
 import type { Form } from '@/api/form/contracts/form-schema';
 import { Fragment, useState } from 'react';
@@ -30,13 +33,17 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { QUESTION_TYPE_LABELS } from '../../../utils/question-type-labels';
+import { Badge } from '@/components/ui/badge';
 
 interface QuestionCardProps {
     question: FormQuestion;
     siblings: FormQuestion[];
     siblingIndex: number;
     draft: Form;
-    onAddQuestion: (parentId: number | null) => void;
+    onAddQuestion: (
+        parentId: number | null,
+        answerScope: FormQuestionScope,
+    ) => void;
     onEditQuestion: (question: FormQuestion) => void;
     onDeleteQuestion: (question: FormQuestion) => void;
 }
@@ -146,8 +153,13 @@ export default function QuestionCard({
                     onClick={() => onEditQuestion(question)}
                     className="group hover:bg-muted/40 dark:hover:bg-muted/40 h-auto min-w-0 flex-1 flex-col items-start justify-start gap-1 px-1.5 py-1 text-left font-normal whitespace-normal"
                 >
-                    <span className="text-sm font-medium group-hover:underline">
-                        {question.label}
+                    <span className="flex w-full flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium group-hover:underline">
+                            {question.label}
+                        </span>
+                        {question.isUnitIdentityComponent && (
+                            <Badge variant="secondary">Identity</Badge>
+                        )}
                     </span>
                     <span className="text-muted-foreground flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                         <span>{QUESTION_TYPE_LABELS[question.type]}</span>
@@ -184,7 +196,9 @@ export default function QuestionCard({
                             Edit question
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                            onSelect={() => onAddQuestion(question.id)}
+                            onSelect={() =>
+                                onAddQuestion(question.id, question.answerScope)
+                            }
                         >
                             <CornerDownRight />
                             Add follow-up

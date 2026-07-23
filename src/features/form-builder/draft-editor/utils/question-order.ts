@@ -49,18 +49,21 @@ export function swapAdjacentSiblings(
     const siblingGroup = findSiblingGroup(questionToMoveId, draft.questions);
     if (!siblingGroup) return null;
 
-    const siblingsSortedByOrder = [...siblingGroup].sort(
-        (a, b) => a.order - b.order,
-    );
-    const questionToMoveIndex = siblingsSortedByOrder.findIndex(
+    const questionToMove = siblingGroup.find(
         question => question.id === questionToMoveId,
     );
+    if (!questionToMove) return null;
+
+    const sameScopeSiblingsSortedByOrder = siblingGroup
+        .filter(sibling => sibling.answerScope === questionToMove.answerScope)
+        .sort((a, b) => a.order - b.order);
+    const questionToMoveIndex =
+        sameScopeSiblingsSortedByOrder.indexOf(questionToMove);
     const swapPartnerIndex =
         direction === 'up' ? questionToMoveIndex - 1 : questionToMoveIndex + 1;
 
-    const questionToMove = siblingsSortedByOrder[questionToMoveIndex];
-    const swapPartner = siblingsSortedByOrder[swapPartnerIndex];
-    if (!questionToMove || !swapPartner) return null;
+    const swapPartner = sameScopeSiblingsSortedByOrder[swapPartnerIndex];
+    if (!swapPartner) return null;
 
     return [
         { id: questionToMove.id, order: swapPartner.order },

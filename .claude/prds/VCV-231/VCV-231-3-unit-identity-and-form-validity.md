@@ -1,5 +1,9 @@
 # VCV-231 · Step 3 — Unit Identity, Same-Scope Prerequisites & Publish Gate
 
+> **Status: ✅ DONE (2026-07-23).** `typecheck` + `lint` pass in-session; reviewer
+> manual pass pending. See the implementation note at the end for what shipped,
+> deviations, and downstream impact.
+>
 > Slice 3 of 4. See [Step 0](./VCV-231-0-overview.md). Depends on Steps 1–2.
 > Assumes `.claude/CONTEXT.md` and ADR 0002 — this step **implements** those
 > invariants.
@@ -127,3 +131,89 @@ no identity component.
 - All three concerns here enforce **one** thing: a per-unit form whose units can
   always be identified. They ship together because they are the rules that make
   Step 2's per-unit section valid.
+
+---
+
+## What was implemented (✅ done)
+
+Verified on disk; `typecheck` and `lint` both pass (run in-session).
+
+- **`question-form-schema.ts`** — added `isUnitIdentityComponent: z.boolean()`; a
+  second `.refine` enforces identity ⇒ required.
+- **`question-form.tsx`** — identity toggle ("Identifies this collection") shown
+  only on unit-scoped **roots**; a read-only "Part of collection identity"
+  indicator on identity follow-ups; the Required switch locks on (with a plain
+  hint) whenever the question is identity; the visibility-rule editor is hidden
+  only for identity **roots** (identity follow-ups branch freely — the AC/AD/BE
+  machinery); first per-unit question defaults identity **on**; last remaining
+  identity root's toggle is disabled in the off-direction; `answerScope` is passed
+  to the prerequisite editor. `isUnitIdentityComponent` is sent on **both** create
+  and edit via one shared `questionRequestFields` object.
+- **`question-card.tsx`** — a secondary "Identity" badge beside the label when
+  `question.isUnitIdentityComponent`.
+- **`prerequisite-editor.tsx`** — new `answerScope` prop; referencable targets are
+  filtered to the **same** scope.
+- **`publish-sheet.tsx`** — root-only ≥1-identity publish gate: publish is disabled
+  with an inline "per-collection questions but no identifying question" message
+  when a per-unit question exists and no root is an identity component.
+
+## Deviations from the plan (each justified)
+
+1. **Inline UI strings, not named constants** (plan asked for constants) — per
+   standing direction and the Step 2 precedent. All copy surfaces **"collection"**
+   (never "unit"); **"collection batch"** is intended, confirmed terminology.
+2. **`isUnitIdentityComponent` sent on edit too**, via a shared
+   `questionRequestFields` base spread into the create body with the creation-only
+   fields (`parentId` / `answerScope` / `order`). This dedupes the two request
+   bodies **and** makes the root identity toggle persist on edit (user story 8).
+3. **Publish gate checks roots only** (`draftForm.questions.some(...)`), not a full
+   tree walk. A question tree is single-scope (a follow-up inherits its root's
+   scope), so a root's scope covers its whole subtree — same result, no traversal,
+   no `walkQuestions` import.
+4. **No inline comments / no `// see ADR 0002` markers.** Per explicit direction,
+   code is kept self-explanatory rather than commented. This is a **convention
+   shift**: it contradicts the code→ADR-marker guidance in ADR 0002's "Applies to"
+   section and prior steps (see Downstream).
+5. **No util extracted.** The plan floated `draftHasUnitQuestionsButNoIdentity(draft)`
+   "if reused across the sheet and publish gate"; it is used **only** in the publish
+   gate (the sheet uses `identityRootQuestions.length === 0` for the first-unit
+   default and `otherIdentityRootCount === 0` for the backstop — related but
+   distinct predicates), so it stays inline (single consumer).
+
+## Downstream impact & how to address it
+
+- **Identity-toggle cascade gap (decision needed; carry into Step 4 or a
+  follow-up).** Inheritance is applied at **create** time — a follow-up is sent its
+  parent's identity flag. Toggling an **existing** root's identity *off* after it
+  already has follow-ups PUTs only the root; its follow-ups keep
+  `isUnitIdentityComponent: true` in storage, which the review layer reads directly.
+  The builder itself stays internally consistent (the publish gate is
+  root-authoritative; the card badge reads the stored per-question flag). If this
+  must be airtight: cascade the toggle to the subtree via batched `mutateAsync`
+  (like reorder), bar toggling identity off on a root that has follow-ups, or have
+  review derive identity from the root. **Out of Step 3's 5-file scope** — flagged
+  for a decision, not silently expanded.
+- **ADR 0002 "Applies to" is now stale.** It instructs readers to grep for
+  `// see ADR 0002` at the identity derivation, the prerequisite filter, and the
+  publish gate; under the no-comments convention those markers are intentionally
+  absent. Update the ADR's "Applies to" (and the recorded ADR-conventions note) so
+  the docs match the self-explanatory-code convention, or treat markers as an
+  exception here.
+- **Step 4 (diff & viewer)** only reads `answerScope` / `isUnitIdentityComponent`
+  off the questions (both round-trip through the Step 1 contracts unchanged); it has
+  no dependency on Step 3's authoring UI.
+
+## Testing status
+
+- `typecheck` + `lint` green (run in-session). No automated tests (no runner).
+- Manual verification to be run by the reviewer on a Dynamic (non-Uganda) program:
+  toggle identity on a per-collection root → Required locks on and the visibility
+  editor disappears; add a follow-up → it inherits identity read-only and stays
+  required with the visibility editor still available; the last identity toggle
+  can't be switched off; publish is blocked with a per-collection question and no
+  identity, then allowed after adding one; a prerequisite target list offers
+  same-scope questions only; toggle identity on an **existing** root → reload →
+  it persists.
+- First unit-test targets once a runner lands: the root-only ≥1-identity publish
+  predicate and the same-scope prerequisite target filter (both pure,
+  side-effect-free).

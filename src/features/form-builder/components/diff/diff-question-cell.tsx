@@ -86,9 +86,25 @@ export default function DiffQuestionCell({
     const isLabelChanged = Boolean(fieldChanges.label);
     const isTypeChanged = Boolean(fieldChanges.type);
     const isRequirednessChanged = Boolean(fieldChanges.required);
+    const isIdentityChanged = Boolean(fieldChanges.isUnitIdentityComponent);
     const isPrerequisiteChanged = Boolean(fieldChanges.prerequisite);
     const isOptionsChanged = Boolean(fieldChanges.options);
     const isParentChanged = Boolean(fieldChanges.parent);
+
+    function describeParentSide(
+        side: 'left' | 'right',
+        parentChange: QuestionDiff['fieldChanges']['parent'],
+    ): string {
+        if (!parentChange) return '';
+        if (side === 'left') {
+            return parentChange.from
+                ? `Was a follow-up under "${parentChange.from.label}"`
+                : 'Was a top-level question';
+        }
+        return parentChange.to
+            ? `Now a follow-up under "${parentChange.to.label}"`
+            : 'Now a top-level question';
+    }
 
     return (
         <div className={`h-full rounded-md shadow-sm ${style.cardClass}`}>
@@ -102,12 +118,26 @@ export default function DiffQuestionCell({
                     </div>
                 )}
                 <div className="min-w-0 flex-1 space-y-1">
-                    <div
-                        className={`text-sm font-medium ${
-                            isLabelChanged ? changedFieldHighlightClass : ''
-                        }`}
-                    >
-                        {question.label}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span
+                            className={`text-sm font-medium ${
+                                isLabelChanged ? changedFieldHighlightClass : ''
+                            }`}
+                        >
+                            {question.label}
+                        </span>
+                        {question.isUnitIdentityComponent && (
+                            <Badge
+                                variant="secondary"
+                                className={
+                                    isIdentityChanged
+                                        ? changedFieldHighlightClass
+                                        : undefined
+                                }
+                            >
+                                Identity
+                            </Badge>
+                        )}
                     </div>
                     <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                         <span
@@ -190,19 +220,4 @@ export default function DiffQuestionCell({
             </div>
         </div>
     );
-}
-
-function describeParentSide(
-    side: 'left' | 'right',
-    parentChange: QuestionDiff['fieldChanges']['parent'],
-): string {
-    if (!parentChange) return '';
-    if (side === 'left') {
-        return parentChange.from
-            ? `Was a follow-up under "${parentChange.from.label}"`
-            : 'Was a top-level question';
-    }
-    return parentChange.to
-        ? `Now a follow-up under "${parentChange.to.label}"`
-        : 'Now a top-level question';
 }
