@@ -145,8 +145,8 @@ programs have none). _Avoid_: sub-session, repeat, group.
 "Per-collection questions", "answered again for each collection — each trap,
 room, or HLC hour"). This is **presentation-only**: **code, schemas, query
 params, and this glossary keep `Session Unit` / `unit` / `SESSION_UNIT` /
-`isUnitIdentityComponent`**. Rule of thumb — `collection` appears **only inside a
-user-facing string literal**; identifiers never use it. Every downstream step
+`isUnitIdentityComponent`**. Rule of thumb — `collection` appears **only inside
+a user-facing string literal**; identifiers never use it. Every downstream step
 follows the split: the screen says "collection", the code says "unit".
 
 **"order" is overloaded — two distinct fields.** A Session Unit's

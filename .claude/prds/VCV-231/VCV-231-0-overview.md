@@ -2,8 +2,8 @@
 
 Authoring **Session** vs **Session Unit** questions in the form builder. Read
 `.claude/CONTEXT.md` (Forms & Sessions) and
-`.claude/docs/adr/0002-form-answer-scope-and-unit-identity.md` first — every step
-assumes their domain language and invariants.
+`.claude/docs/adr/0002-form-answer-scope-and-unit-identity.md` first — every
+step assumes their domain language and invariants.
 
 ## Problem Statement
 
@@ -11,8 +11,8 @@ The form builder only authors **Session-level** questions — one answer per
 Session. A Dynamic Form program also collects data per **Session Unit** (a
 trap/room repeated within one visit). An admin has no way to mark a question as
 answered per unit, and no way to designate which per-unit answers **identify** a
-unit so the review layer can match "the same" unit across visits. Those forms can
-only be built today by raw API calls.
+unit so the review layer can match "the same" unit across visits. Those forms
+can only be built today by raw API calls.
 
 ## Solution
 
@@ -47,12 +47,12 @@ Each step is one commit-sized slice of **3–5 file changes**, built incremental
 rule 8). Utilities are **not** pre-declared — they precipitate only on real
 reuse/friction.
 
-| Step | Slice | Files |
-| ---- | ----- | ----- |
-| 1 | [Contracts & data layer](./VCV-231-1-contracts.md) | 3 |
-| 2 | [Two-section builder & scope authoring](./VCV-231-2-two-section-builder.md) | 5 |
-| 3 | [Unit identity, same-scope prerequisites & publish gate](./VCV-231-3-unit-identity-and-form-validity.md) | 5 |
-| 4 | [Scope & identity in diff and viewer](./VCV-231-4-diff-and-viewer.md) | 3 |
+| Step | Slice                                                                                                    | Files |
+| ---- | -------------------------------------------------------------------------------------------------------- | ----- |
+| 1    | [Contracts & data layer](./VCV-231-1-contracts.md)                                                       | 3     |
+| 2    | [Two-section builder & scope authoring](./VCV-231-2-two-section-builder.md)                              | 5     |
+| 3    | [Unit identity, same-scope prerequisites & publish gate](./VCV-231-3-unit-identity-and-form-validity.md) | 5     |
+| 4    | [Scope & identity in diff and viewer](./VCV-231-4-diff-and-viewer.md)                                    | 3     |
 
 **Expected total: ~15 files changed** (14 distinct; `question-form.tsx` evolves
 across steps 2 and 3).
@@ -126,8 +126,8 @@ last so the diff reflects the finished authoring model.
 ## Testing Decisions
 
 - **No automated tests this round** — no runner in the repo (only `typecheck`,
-  `lint`, `format`), consistent with VCV-203/208. Confidence = typecheck + lint +
-  manual verification per step.
+  `lint`, `format`), consistent with VCV-203/208. Confidence = typecheck +
+  lint + manual verification per step.
 - Pure functions that precipitate on demand (the same-scope target filter, the
   ≥1-identity publish predicate, the per-scope reorder) are written with no
   React/state/side effects and become the first unit-test targets once a runner
@@ -135,7 +135,7 @@ last so the diff reflects the finished authoring model.
 
 ## Out of Scope (whole epic)
 
-- **Answer submission** (mobile/field per-unit recording) — only *consumes*
+- **Answer submission** (mobile/field per-unit recording) — only _consumes_
   `answerScope`.
 - **Review / reconciliation** (Metadata Conflict, Review Unit) — downstream.
 - **CSV export** changes; **backend** changes (fields already exist).
@@ -145,4 +145,5 @@ last so the diff reflects the finished authoring model.
 ## Further Notes
 
 - Domain language & invariants: `.claude/CONTEXT.md` (Forms & Sessions).
-- Decision record: `.claude/docs/adr/0002-form-answer-scope-and-unit-identity.md`.
+- Decision record:
+  `.claude/docs/adr/0002-form-answer-scope-and-unit-identity.md`.

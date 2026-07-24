@@ -13,36 +13,36 @@
 
 The historical viewer compares a published version against the current draft
 using the shared diff components. Those components know nothing about
-`answerScope` or `isUnitIdentityComponent`, so a reviewer comparing v1 → v2 can't
-see that a question became per-unit or that an identity component was toggled —
-exactly the structural changes this feature introduces.
+`answerScope` or `isUnitIdentityComponent`, so a reviewer comparing v1 → v2
+can't see that a question became per-unit or that an identity component was
+toggled — exactly the structural changes this feature introduces.
 
 ## Solution
 
-Teach the version diff about the two new fields: group the diff into the same two
-scope sections as the builder (Session / Per-unit), and treat an
-`isUnitIdentityComponent` change as a field-level modification with an **Identity**
-badge and the standard left/right change highlight. Because scope is immutable per
-question, a scope difference can only appear as a removal from one section plus an
-addition in the other — which the existing added/removed rendering already
-handles.
+Teach the version diff about the two new fields: group the diff into the same
+two scope sections as the builder (Session / Per-unit), and treat an
+`isUnitIdentityComponent` change as a field-level modification with an
+**Identity** badge and the standard left/right change highlight. Because scope
+is immutable per question, a scope difference can only appear as a removal from
+one section plus an addition in the other — which the existing added/removed
+rendering already handles.
 
 ## User Stories
 
 1. As a reviewer, I want the version diff split into Session and Per-unit
    sections, so that I read changes at the same granularity I authored them.
 2. As a reviewer, I want a per-unit question to show an "Identity" badge in the
-   diff when it is an identity component, so that I can see which answers identify
-   a unit in that version.
-3. As a reviewer, I want a question that gained or lost identity between versions
-   to be highlighted as modified, so that I notice the change.
+   diff when it is an identity component, so that I can see which answers
+   identify a unit in that version.
+3. As a reviewer, I want a question that gained or lost identity between
+   versions to be highlighted as modified, so that I notice the change.
 4. As a reviewer, I want a question that moved scope (removed from one section,
    added to the other) to read clearly as a remove + add, so that I'm not
    confused by an impossible in-place scope change.
 5. As a reviewer, I want the diff summary counts to include identity changes as
    modifications, so that the summary stays accurate.
-6. As a reviewer, I want unchanged scope/identity to render exactly as before, so
-   that nothing regresses in the existing diff.
+6. As a reviewer, I want unchanged scope/identity to render exactly as before,
+   so that nothing regresses in the existing diff.
 
 ## Implementation Decisions
 
@@ -52,8 +52,8 @@ handles.
   on the right (existing orientation).
 - **Identity as a field change.** `form-version-diff.ts` adds
   `isUnitIdentityComponent` to the per-question field comparison so a toggle
-  registers as a `modified` diff (and flows into the existing summary counts). No
-  new diff *kind* is introduced.
+  registers as a `modified` diff (and flows into the existing summary counts).
+  No new diff _kind_ is introduced.
 - **No in-place scope change.** Scope is immutable per question id, so the diff
   never renders a scope "field change"; a scope difference manifests as
   removed-here + added-there, already covered by the added/removed cells. The
@@ -63,10 +63,10 @@ handles.
   side-appropriate change highlight (left = removed/destructive, right =
   added/success) when identity is among the field changes — mirroring how
   `required`/`type` changes are already highlighted.
-- **Build inline-first, reuse existing shape.** No new util or intermediate type;
-  extend the existing `QuestionDiff` field-change comparison and the existing
-  cell/list components. Badge uses the shadcn `Badge` already imported in the
-  cell.
+- **Build inline-first, reuse existing shape.** No new util or intermediate
+  type; extend the existing `QuestionDiff` field-change comparison and the
+  existing cell/list components. Badge uses the shadcn `Badge` already imported
+  in the cell.
 
 ## Files changed (3)
 
@@ -84,16 +84,16 @@ handles.
 - **No automated tests this round.** Manual: check out a version, edit the draft
   to (a) add a per-unit question, (b) toggle an identity component, (c) delete a
   Session question and recreate it as per-unit; confirm the diff shows the
-  per-unit section, an Identity badge, a modified highlight on the toggle, and the
-  scope move as remove + add. Confirm the summary counts update.
+  per-unit section, an Identity badge, a modified highlight on the toggle, and
+  the scope move as remove + add. Confirm the summary counts update.
 - The field comparison in `form-version-diff.ts` is pure and already the kind of
   logic that would be unit-tested first once a runner exists.
 
 ## Out of Scope
 
 - A standalone read-only single-version render — the historical viewer always
-  diffs against the draft, so identity/scope surface through the diff components;
-  no separate viewer surface exists to change.
+  diffs against the draft, so identity/scope surface through the diff
+  components; no separate viewer surface exists to change.
 - CSV export coverage of the new fields.
 - Any authoring behavior (Steps 2–3).
 
@@ -117,8 +117,8 @@ touched files all pass (run in-session). Exactly the 3 planned files changed.
   point now **partitions root questions by `answerScope`** and runs
   `buildSiblingDiffs` once per scope, concatenating into the same flat
   `questionDiffs` return; `diffSummary` accumulates across both calls.
-- **`diff-question-list.tsx`** — groups the flat `questionDiffs` into two
-  scope sections ("Session questions" / "Per-collection questions", matching the
+- **`diff-question-list.tsx`** — groups the flat `questionDiffs` into two scope
+  sections ("Session questions" / "Per-collection questions", matching the
   builder's wording in `question-list.tsx`) via a local `resolveDiffScope`
   reading `answerScope` off each diff's `to ?? from` question. The single
   from/left · to/right column header stays at the top (orientation preserved);
@@ -163,23 +163,25 @@ touched files all pass (run in-session). Exactly the 3 planned files changed.
 ## Downstream impact & how to address it
 
 - **The identity-toggle cascade gap (Step 3) is now user-visible in the diff.**
-  The diff faithfully renders each question's **stored** `isUnitIdentityComponent`
-  flag. Because toggling an existing root's identity *off* PUTs only the root,
-  its follow-ups keep `isUnitIdentityComponent: true` in storage — so the diff
-  will show those follow-ups with an "Identity" badge while their root no longer
-  has one. This is a **correct rendering of stored data**, not a Step 4 bug; it
-  makes the carried-over Step 3 cascade gap visible on a new surface. Still needs
-  a decision (cascade the toggle to the subtree, bar toggling-off on a root with
-  follow-ups, or derive identity from the root in review). **Not fixed here** —
-  the fix lives in authoring/review, outside Step 4's 3-file scope.
+  The diff faithfully renders each question's **stored**
+  `isUnitIdentityComponent` flag. Because toggling an existing root's identity
+  _off_ PUTs only the root, its follow-ups keep `isUnitIdentityComponent: true`
+  in storage — so the diff will show those follow-ups with an "Identity" badge
+  while their root no longer has one. This is a **correct rendering of stored
+  data**, not a Step 4 bug; it makes the carried-over Step 3 cascade gap visible
+  on a new surface. Still needs a decision (cascade the toggle to the subtree,
+  bar toggling-off on a root with follow-ups, or derive identity from the root
+  in review). **Not fixed here** — the fix lives in authoring/review, outside
+  Step 4's 3-file scope.
 - **Diff/viewer needs no further scope/identity work.** Both the publish sheet
   and the historical viewer consume the unchanged `{ questionDiffs, summary }`
-  shape and `DiffQuestionList` props, so both surfaces were lit up without edits.
+  shape and `DiffQuestionList` props, so both surfaces were lit up without
+  edits.
 
 ## Testing status
 
-- `typecheck` + `lint` + `prettier --check` (three touched files) green,
-  run in-session. No automated tests (no runner).
+- `typecheck` + `lint` + `prettier --check` (three touched files) green, run
+  in-session. No automated tests (no runner).
 - Manual verification to be run by the reviewer on a Dynamic (non-Uganda)
   program: open the publish sheet on a draft that adds a per-collection question
   and toggles identity on an existing root → the diff renders two scope sections

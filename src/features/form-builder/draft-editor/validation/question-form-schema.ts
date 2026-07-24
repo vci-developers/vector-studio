@@ -16,7 +16,8 @@ export const questionFormSchema = z
     })
     .refine(data => !data.isUnitIdentityComponent || data.required, {
         path: ['required'],
-        message: 'A question that identifies a collection batch must always be answered.',
+        message:
+            'A question that identifies a collection batch must always be answered.',
     });
 
 export type QuestionFormInput = z.infer<typeof questionFormSchema>;

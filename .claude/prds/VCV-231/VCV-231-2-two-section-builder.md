@@ -20,29 +20,31 @@ Split the draft editor's question area into two labelled sections — **Session
 questions** and **Per-unit questions** — each with a short explainer, its own
 "Add" button, and its own reorder. The section you add from **is** the scope
 choice: a question created in the Per-unit section is `SESSION_UNIT`, and scope
-is immutable thereafter (no selector in the edit sheet). A follow-up inherits its
-parent's scope. Reorder swaps only same-scope root siblings.
+is immutable thereafter (no selector in the edit sheet). A follow-up inherits
+its parent's scope. Reorder swaps only same-scope root siblings.
 
 ## User Stories
 
 1. As a program admin, I want Session and Per-unit questions in two labelled
    sections, so that I always know which granularity I'm editing.
-2. As a program admin, I want a short note on each section explaining it, so that
-   I understand "per unit" without external docs.
-3. As a program admin, I want an "Add" button in each section, so that creating a
-   question there sets its scope automatically.
-4. As a program admin, I want a per-unit question I create to be answered once per
-   Session Unit, so that repeated sub-units are captured correctly.
+2. As a program admin, I want a short note on each section explaining it, so
+   that I understand "per unit" without external docs.
+3. As a program admin, I want an "Add" button in each section, so that creating
+   a question there sets its scope automatically.
+4. As a program admin, I want a per-unit question I create to be answered once
+   per Session Unit, so that repeated sub-units are captured correctly.
 5. As a program admin, I want a follow-up to take its parent's scope
    automatically, so that a question tree never mixes granularities.
-6. As a program admin, I want the edit sheet to have no scope control, so that I'm
-   not offered an edit the system doesn't support.
-7. As a program admin who wants to change a question's scope, I want to delete and
-   recreate it in the other section, so that the change is explicit and safe.
+6. As a program admin, I want the edit sheet to have no scope control, so that
+   I'm not offered an edit the system doesn't support.
+7. As a program admin who wants to change a question's scope, I want to delete
+   and recreate it in the other section, so that the change is explicit and
+   safe.
 8. As a program admin, I want to reorder questions within a section without
    affecting the other section, so that ordering stays sensible per screen.
-9. As a program admin, I want each section to show its own empty state, so that an
-   empty Per-unit section reads as "optional / add if you collect per-unit data".
+9. As a program admin, I want each section to show its own empty state, so that
+   an empty Per-unit section reads as "optional / add if you collect per-unit
+   data".
 10. As a program admin, I want existing (Session) questions to keep working
     unchanged, so that nothing regresses.
 
@@ -52,10 +54,10 @@ parent's scope. Reorder swaps only same-scope root siblings.
   `answerScope === 'SESSION'`; the Per-unit section renders
   `answerScope === 'SESSION_UNIT'`. Each renders its scope's roots sorted by
   `order`, with the existing card/subtree rendering unchanged.
-- **Add flow carries scope.** `draft-editor.tsx` tracks the scope of the question
-  being added (alongside the existing `parentIdForNewQuestion`) and threads it to
-  the sheet; `question-form.tsx` sends it as `answerScope` on create. A
-  **follow-up** ignores the section and inherits the parent question's
+- **Add flow carries scope.** `draft-editor.tsx` tracks the scope of the
+  question being added (alongside the existing `parentIdForNewQuestion`) and
+  threads it to the sheet; `question-form.tsx` sends it as `answerScope` on
+  create. A **follow-up** ignores the section and inherits the parent question's
   `answerScope`.
 - **No scope selector in the sheet.** Scope is set only at create time and is
   immutable; the edit sheet exposes label/type/required/options/visibility as
@@ -89,13 +91,13 @@ parent's scope. Reorder swaps only same-scope root siblings.
 
 ## Testing Decisions
 
-- **No automated tests this round.** Manual: add a Session question and a Per-unit
-  question; confirm they land in the right sections and persist across reload;
-  add a follow-up under each and confirm it inherits scope; reorder within a
-  section and confirm the other section is untouched.
-- The same-scope reorder resolution is pure and becomes a unit-test target once a
-  runner exists (given a draft + a root id + direction → the two `{ id, order }`
-  swaps stay within scope).
+- **No automated tests this round.** Manual: add a Session question and a
+  Per-unit question; confirm they land in the right sections and persist across
+  reload; add a follow-up under each and confirm it inherits scope; reorder
+  within a section and confirm the other section is untouched.
+- The same-scope reorder resolution is pure and becomes a unit-test target once
+  a runner exists (given a draft + a root id + direction → the two
+  `{ id, order }` swaps stay within scope).
 
 ## Out of Scope
 
@@ -132,8 +134,8 @@ Verified on disk; `typecheck`, `lint`, and `prettier --check` all pass.
   constants); title is scope-aware for a new root, description is generic.
 - **`question-form.tsx`** — sends `answerScope` on **CREATE only**; edit/PUT
   omits it (immutable). `isUnitIdentityComponent` not sent (Step 3).
-- **`question-card.tsx`** — `onAddQuestion` now carries the new question's scope;
-  "Add follow-up" passes `question.answerScope` (a follow-up inherits its
+- **`question-card.tsx`** — `onAddQuestion` now carries the new question's
+  scope; "Add follow-up" passes `question.answerScope` (a follow-up inherits its
   parent's scope at the source — no lookup).
 - **`no-questions-empty-state.tsx`** — **deleted** (its only consumer was
   `question-list`; per-section empty states replaced it).
@@ -152,8 +154,9 @@ Verified on disk; `typecheck`, `lint`, and `prettier --check` all pass.
 3. **Sheet description is generic, not per-scope** — the section note already
    explains the scope, so only the sheet **title** is scope-aware. Removed the
    per-scope description `Record` as over-engineering.
-4. **`QuestionScopeSection` lives in its own file** (`question-scope-section.tsx`)
-   rather than inline in `question-list.tsx`. It is a component, not a util.
+4. **`QuestionScopeSection` lives in its own file**
+   (`question-scope-section.tsx`) rather than inline in `question-list.tsx`. It
+   is a component, not a util.
 5. **UI language = "collection", code = "unit".** A Session Unit is surfaced to
    admins as a **collection** ("Per-collection questions", "each collection …");
    all code/schemas keep `SESSION_UNIT` / `unit` / `isUnitIdentityComponent`.
@@ -168,15 +171,16 @@ Verified on disk; `typecheck`, `lint`, and `prettier --check` all pass.
   badge is additive — no rework, no conflict.
 - **Step 3 & 4 must apply the collection/unit language split.** Every new
   user-facing string — identity toggle label, publish-gate error, diff/viewer
-  scope headers — uses **"collection"**; the code keeps `isUnitIdentityComponent`
-  / `SESSION_UNIT`. (e.g. surface "This collection needs at least one identifying
-  question", not "unit".) Enforced by the `CONTEXT.md` rule.
+  scope headers — uses **"collection"**; the code keeps
+  `isUnitIdentityComponent` / `SESSION_UNIT`. (e.g. surface "This collection
+  needs at least one identifying question", not "unit".) Enforced by the
+  `CONTEXT.md` rule.
 - **Step 0 change map is slightly stale**: Step 2 is 6+1+1, and
-  `no-questions-empty-state.tsx` no longer exists. Update the counts there if you
-  want the map exact; behaviourally nothing else shifts.
+  `no-questions-empty-state.tsx` no longer exists. Update the counts there if
+  you want the map exact; behaviourally nothing else shifts.
 - **Nit — restore the ADR pointer.** The same-scope reorder filter in
-  `question-order.ts` lost its `// see ADR 0002` comment during apply; ADR 0002's
-  "Applies to" section tells readers to look for that marker. Recommend
+  `question-order.ts` lost its `// see ADR 0002` comment during apply; ADR
+  0002's "Applies to" section tells readers to look for that marker. Recommend
   re-adding one line above the `.filter(...)`.
 
 ## Testing status
