@@ -4,29 +4,29 @@ import { networkErrorMessage } from '@/lib/network/network-error';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
-    addLocationLevelFormSchema,
-    type AddLocationLevelFormInput,
-} from '../../validation/add-location-level-form-schema';
+    addLocationTypeFormSchema,
+    type AddLocationTypeFormInput,
+} from '../../validation/add-location-type-form-schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Field, FieldError } from '@/components/ui/field';
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 
-interface AddLocationLevelFormProps {
+interface AddLocationTypeFormProps {
     programId: number;
     locationTypes: LocationType[];
 }
 
-export default function AddLocationLevelForm({
+export default function AddLocationTypeForm({
     programId,
     locationTypes,
-}: AddLocationLevelFormProps) {
+}: AddLocationTypeFormProps) {
     const { mutateAsync: createLocationTypeForProgram } =
         usePostLocationTypeToProgram();
 
-    const addLocationLevelForm = useForm<AddLocationLevelFormInput>({
-        resolver: zodResolver(addLocationLevelFormSchema),
+    const addLocationTypeForm = useForm<AddLocationTypeFormInput>({
+        resolver: zodResolver(addLocationTypeFormSchema),
         defaultValues: { name: '' },
     });
 
@@ -37,7 +37,7 @@ export default function AddLocationLevelForm({
               ) + 1
             : 1;
 
-    async function onSubmit(data: AddLocationLevelFormInput) {
+    async function onSubmit(data: AddLocationTypeFormInput) {
         const createLocationTypeForProgramResult =
             await createLocationTypeForProgram({
                 programId,
@@ -52,14 +52,14 @@ export default function AddLocationLevelForm({
             return;
         }
         toast.success('New location level created successfully');
-        addLocationLevelForm.reset();
+        addLocationTypeForm.reset();
     }
 
     return (
-        <form onSubmit={addLocationLevelForm.handleSubmit(onSubmit)}>
+        <form onSubmit={addLocationTypeForm.handleSubmit(onSubmit)}>
             <Controller
                 name="name"
-                control={addLocationLevelForm.control}
+                control={addLocationTypeForm.control}
                 render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
                         <div className="flex items-center gap-2">
@@ -76,10 +76,10 @@ export default function AddLocationLevelForm({
                                 variant="outline"
                                 size="sm"
                                 disabled={
-                                    addLocationLevelForm.formState.isSubmitting
+                                    addLocationTypeForm.formState.isSubmitting
                                 }
                             >
-                                {addLocationLevelForm.formState.isSubmitting ? (
+                                {addLocationTypeForm.formState.isSubmitting ? (
                                     <Loader2 className="animate-spin" />
                                 ) : (
                                     <Plus />

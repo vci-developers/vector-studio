@@ -5,7 +5,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 
-export default function UgandaProgramEmptyState() {
+export default function LegacyProgramEmptyState() {
     return (
         <Card>
             <CardHeader>

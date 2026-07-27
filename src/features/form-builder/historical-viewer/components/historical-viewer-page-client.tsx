@@ -1,6 +1,6 @@
 'use client';
 
-import UgandaProgramEmptyState from '../../components/empty-state/uganda-program-empty-state';
+import LegacyProgramEmptyState from '../../components/empty-state/legacy-program-empty-state';
 import HistoricalViewerSkeleton from './loading/historical-viewer-skeleton';
 import HistoricalViewer from './viewer/historical-viewer';
 import ProgramGate from '@/components/gate/program-gate';
@@ -15,7 +15,7 @@ export default function HistoricalViewerPageClient({
     return (
         <ProgramGate
             skeleton={<HistoricalViewerSkeleton />}
-            ugandaFallback={<UgandaProgramEmptyState />}
+            legacyFallback={<LegacyProgramEmptyState />}
         >
             {programId => (
                 <HistoricalViewer programId={programId} version={version} />

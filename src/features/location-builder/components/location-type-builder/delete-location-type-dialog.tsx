@@ -14,17 +14,17 @@ import { Loader2 } from 'lucide-react';
 import { Fragment } from 'react';
 import { toast } from 'sonner';
 
-interface DeleteLocationLevelDialogProps {
+interface DeleteLocationTypeDialogProps {
     locationType: LocationType | null;
     programId: number;
     onClose: () => void;
 }
 
-export default function DeleteLocationLevelDialog({
+export default function DeleteLocationTypeDialog({
     locationType,
     programId,
     onClose,
-}: DeleteLocationLevelDialogProps) {
+}: DeleteLocationTypeDialogProps) {
     const {
         mutate: deleteLocationTypeFromProgram,
         isPending: isDeletingLocationTypeFromProgram,
