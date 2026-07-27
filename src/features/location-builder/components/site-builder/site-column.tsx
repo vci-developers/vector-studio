@@ -1,3 +1,5 @@
+'use client';
+
 import type { LocationType } from '@/api/location-type/contracts/location-type-schema';
 import type { Site } from '@/api/site/contracts/site-schema';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -11,7 +13,9 @@ interface SiteColumnProps {
     selectedSiteId: number | null;
     parentSiteId: number | null;
     newSiteLocationType: LocationType | null;
+    activeSiteIds: Set<number>;
     onSelectSite: (siteId: number) => void;
+    onToggleSiteActivation: (siteId: number, nextIsActive: boolean) => void;
 }
 
 export default function SiteColumn({
@@ -21,7 +25,9 @@ export default function SiteColumn({
     selectedSiteId,
     parentSiteId,
     newSiteLocationType,
+    activeSiteIds,
     onSelectSite,
+    onToggleSiteActivation,
 }: SiteColumnProps) {
     return (
         <div className="flex w-64 shrink-0 flex-col">
@@ -36,7 +42,9 @@ export default function SiteColumn({
                             site={site}
                             showAncestorNames={parentSiteId === null}
                             isSelected={site.siteId === selectedSiteId}
+                            isActive={activeSiteIds.has(site.siteId)}
                             onSelect={() => onSelectSite(site.siteId)}
+                            onToggleSiteActivation={onToggleSiteActivation}
                         />
                     ))}
                 </div>

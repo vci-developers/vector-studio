@@ -10,6 +10,7 @@ import { userKeys } from '@/api/user/user-keys';
 type PutSiteVariables = {
     siteId: number;
     requestBody: PutSiteRequestBody;
+    skipPermissionsRefetch?: boolean;
 };
 
 type PutSiteMutationResult = Result<PutSiteSuccessPayload, NetworkError>;
@@ -36,8 +37,8 @@ export function usePutSite() {
 
     return useMutation({
         mutationFn: updateSite,
-        onSuccess: data => {
-            if (data.ok) {
+        onSuccess: (data, variables) => {
+            if (data.ok && !variables.skipPermissionsRefetch) {
                 queryClient.invalidateQueries({
                     queryKey: userKeys.permissions(),
                 });

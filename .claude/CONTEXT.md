@@ -32,11 +32,10 @@ empty object `{}` here**; a non-empty map signals a hierarchical Site.
 `subCounty`, `parish`, `villageName`, `houseNumber`, `healthCenter`) with no
 Location Types. Today these are the programs with **ids 1, 2, and 4** (Uganda
 plus two others); all will be migrated later. Recognised **structurally, not by
-a fixed id list**: a Legacy
-Site always carries an empty `locationHierarchy` (`{}`), so a program whose
-accessible Sites are all empty-hierarchy is Legacy. A small known-legacy-id set
-backstops the one blind spot — a Legacy user with no accessible Sites. _Avoid_:
-"flat program" used inconsistently.
+a fixed id list**: a Legacy Site always carries an empty `locationHierarchy`
+(`{}`), so a program whose accessible Sites are all empty-hierarchy is Legacy. A
+small known-legacy-id set backstops the one blind spot — a Legacy user with no
+accessible Sites. _Avoid_: "flat program" used inconsistently.
 
 **Hierarchical program**: Any non-legacy program — uses Location Types + the
 self-referencing Site tree. All programs other than id 1, and all new programs,
@@ -66,6 +65,13 @@ are hierarchical.
   scope.** Only the **hierarchical** Site builder is in scope; the legacy flat
   form is cut, since Legacy programs are gated out of the builder and the form
   would never render.
+- "leaf" was used to mean both **a Site at the bottom Level** and **a Site with
+  no children**, and activation was specified as leaf-driven. Resolved: neither
+  reading drives activation — the bottom Level is the editable end of a global,
+  mutable list, and childlessness flips as the tree grows. **Leaf** is now
+  descriptive vocabulary only ("the deepest built Site — the real collection
+  point"); every Site is toggleable and activation is cascaded, not derived (ADR
+  0003). _Avoid_: treating "leaf" as a computed property.
 - "program access code" was used for what is actually the standard authenticated
   session (the `accessToken` cookie → Bearer token via `withAuthSession`). There
   is no separate per-program secret code.
@@ -90,12 +96,12 @@ are hierarchical.
   prevent parent/child inversion. **Delete is backend-blocked** when any Site
   references the Location Type.
 - The builder is gated on **program structure, not a fixed id**: Legacy programs
-  (accessible Sites all carry an empty `locationHierarchy`; today Uganda + Kenya)
-  are hidden; hierarchical programs see the builder. A small known-legacy-id set
-  backstops the blind spot (a Legacy user with no accessible Sites). It lives
-  inside the `(home)` area (`privilege === 3` + whitelisted). **Do not assume all
-  builder users are full-program admins** — the privilege model is expected to
-  fan out into tiers.
+  (accessible Sites all carry an empty `locationHierarchy`; today Uganda +
+  Kenya) are hidden; hierarchical programs see the builder. A small
+  known-legacy-id set backstops the blind spot (a Legacy user with no accessible
+  Sites). It lives inside the `(home)` area (`privilege === 3` + whitelisted).
+  **Do not assume all builder users are full-program admins** — the privilege
+  model is expected to fan out into tiers.
 - **Two-tier authority (target model):** a **Location-type admin** tier may edit
   the global **Levels** (rename / reorder / insert / delete); a **Site manager**
   tier may only create/edit **Sites within `canAccessSites`** and never touches
@@ -116,24 +122,26 @@ are hierarchical.
   nothing. In v1 (single privilege tier) root creation is open behind the
   existing privilege/`writeSiteMetadata` guard, written so it can later narrow
   to a program-admin tier.
-- **Site activity is leaf-driven.** A **leaf** Site (bottom Level — the real
-  collection point) is switched active/inactive directly; an **interior** Site
-  is active **iff it has ≥1 active leaf descendant** — derived, never set on its
-  own. Activating a leaf activates its whole ancestor path (up-cascade);
-  deactivating a Site deactivates its whole subtree (down-cascade); a tree with
-  no active leaf is entirely inactive. Because of this, an "active child under an
-  inactive parent" is **impossible by construction**. Reconciliation is applied
-  at **save**: activation edits are staged as a draft, then committed as one
-  confirmation → one `PUT` per changed Site — never per keystroke. (Create and
-  rename, by contrast, are immediate point actions; **every Site is created
-  inactive** — a freshly built tree is entirely inactive until a leaf is added
-  and then activated, so there is no up-cascade on create.) The model runs
-  **only over
-  `canAccessSites`**: up-cascade stops at the topmost accessible node of a branch
-  and "tree-off when no active leaf" is evaluated over the accessible subtree.
-  Ancestors _above_ a grant are read-only context (only their names are known,
-  via `locationHierarchy`, never their `isActive`); the partial-access case where
-  an out-of-access ancestor is inactive is **deferred** — same residual-risk
+- **Site activity is set per Site and cascaded (ADR 0003).** Every accessible
+  Site carries its own `isActive` and is **directly toggleable**; nothing is
+  derived. Activating a Site activates it and its whole **ancestor path**
+  (up-cascade); deactivating a Site deactivates it and its whole **subtree**
+  (down-cascade). The invariant is that the active set is **ancestor-closed** —
+  an "active Site under an inactive ancestor" is **impossible by construction**.
+  An active Site whose children are all inactive is **legal** and means
+  collection is on at that Site only, which is what a half-built branch looks
+  like. Reconciliation is applied at **save**: activation edits are staged as a
+  draft (seeded from server state, so an untouched builder has zero pending
+  changes), then committed as one confirmation → one `PUT` per changed Site,
+  ordered deactivations-deepest-first then activations-shallowest-first so a
+  partial commit still leaves an ancestor-closed tree — never per keystroke.
+  (Create and rename, by contrast, are immediate point actions; **every Site is
+  created inactive**, and creating a child never changes its parent's state.)
+  The model runs **only over `canAccessSites`** and needs no Location Type data:
+  the up-cascade stops at the topmost accessible node of a branch. Ancestors
+  _above_ a grant are read-only context (only their names are known, via
+  `locationHierarchy`, never their `isActive`); the partial-access case where an
+  out-of-access ancestor is inactive is **deferred** — same residual-risk
   posture as ADR 0001, and inert today under the single `privilege === 3` tier.
 - **Reorder uses the frozen-prefix occupancy computed over the actor's
   accessible Sites.** Residual risk: a Level empty in the actor's view but

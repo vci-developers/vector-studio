@@ -1,6 +1,9 @@
+'use client';
+
 import type { Site } from '@/api/site/contracts/site-schema';
 import { usePutSite } from '@/api/site/hooks/use-put-site';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { networkErrorMessage } from '@/lib/network/network-error';
 import { cn } from '@/utils/cn';
 import { Loader2 } from 'lucide-react';
@@ -11,14 +14,18 @@ interface SiteRowProps {
     site: Site;
     showAncestorNames: boolean;
     isSelected: boolean;
+    isActive: boolean;
     onSelect: () => void;
+    onToggleSiteActivation: (siteId: number, nextIsActive: boolean) => void;
 }
 
 export default function SiteRow({
     site,
     showAncestorNames,
     isSelected,
+    isActive,
     onSelect,
+    onToggleSiteActivation,
 }: SiteRowProps) {
     const { mutate: updateSite, isPending: isUpdatingSite } = usePutSite();
 
@@ -102,6 +109,14 @@ export default function SiteRow({
             {isUpdatingSite && (
                 <Loader2 className="text-muted-foreground size-4 animate-spin" />
             )}
+            <Switch
+                checked={isActive}
+                onCheckedChange={nextIsActive =>
+                    onToggleSiteActivation(site.siteId, nextIsActive)
+                }
+                disabled={isUpdatingSite}
+                aria-label={`Collect data at ${site.name ?? 'unnamed site'}`}
+            />
         </div>
     );
 }

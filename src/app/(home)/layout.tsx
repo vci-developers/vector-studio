@@ -53,7 +53,7 @@ export default async function HomeLayout({ children }: HomeLayoutProps) {
 
     const authorizedUserProfile = authorizedGetUserProfileResult.data.user;
 
-    if (authorizedUserProfile.privilege !== 3) redirect('/forbidden');
+    if (authorizedUserProfile.privilege < 3) redirect('/forbidden');
 
     return <main className="flex-1 p-6">{children}</main>;
 }

@@ -1,3 +1,5 @@
+'use client';
+
 import type { LocationType } from '@/api/location-type/contracts/location-type-schema';
 import { usePostSite } from '@/api/site/hooks/use-post-site';
 import { networkErrorMessage } from '@/lib/network/network-error';
