@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/card';
 import { Layers } from 'lucide-react';
 
-export default function NoLevelsEmptyState() {
+export default function NoLocationTypesEmptyState() {
     return (
         <Card>
             <CardHeader>

@@ -19,26 +19,26 @@ import {
 import { usePutLocationTypeByProgramId } from '@/api/location-type/hooks/use-put-location-type-by-program-id';
 import { toast } from 'sonner';
 import { networkErrorMessage } from '@/lib/network/network-error';
-import NoLevelsEmptyState from '../empty-state/no-levels-empty-state';
+import NoLocationTypesEmptyState from '../empty-state/no-location-types-empty-state';
 import { Card } from '@/components/ui/card';
-import LocationLevelRow from './location-level-row';
-import AddLocationLevelForm from './add-location-level-form';
+import LocationTypeRow from './location-type-row';
+import AddLocationTypeForm from './add-location-type-form';
 import { useState } from 'react';
 import { cn } from '@/utils/cn';
 
-interface LocationLevelListProps {
+interface LocationTypesListProps {
     programId: number;
     locationTypes: LocationType[];
     firstLevelWithNoSitesIndex: number;
     onDeleteLocationType: (locationType: LocationType) => void;
 }
 
-export default function LocationLevelList({
+export default function LocationTypesList({
     programId,
     locationTypes,
     firstLevelWithNoSitesIndex,
     onDeleteLocationType,
-}: LocationLevelListProps) {
+}: LocationTypesListProps) {
     const { mutateAsync: updateLocationTypeForProgram } =
         usePutLocationTypeByProgramId();
     const [isReordering, setIsReordering] = useState(false);
@@ -127,7 +127,7 @@ export default function LocationLevelList({
                 Location levels
             </h2>
             {locationTypes.length === 0 ? (
-                <NoLevelsEmptyState />
+                <NoLocationTypesEmptyState />
             ) : (
                 <Card
                     aria-busy={isReordering}
@@ -148,7 +148,7 @@ export default function LocationLevelList({
                             strategy={verticalListSortingStrategy}
                         >
                             {locationTypes.map((locationType, index) => (
-                                <LocationLevelRow
+                                <LocationTypeRow
                                     key={locationType.id}
                                     locationType={locationType}
                                     displayPosition={index + 1}
@@ -163,7 +163,7 @@ export default function LocationLevelList({
                     </DndContext>
                 </Card>
             )}
-            <AddLocationLevelForm
+            <AddLocationTypeForm
                 programId={programId}
                 locationTypes={locationTypes}
             />

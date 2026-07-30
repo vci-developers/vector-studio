@@ -3,14 +3,28 @@
 import type { UserPermissions } from '@/api/user/contracts/user-permissions-schema';
 import { useGetUserPermissions } from '@/api/user/hooks/use-get-user-permissions';
 import ErrorBanner from '../error/error-banner';
+import type { Site } from '@/api/site/contracts/site-schema';
 
-// TODO: The legacy Uganda program uses the seeded flat schema. Remove this gate
-// once it migrates.
-const UGANDA_PROGRAM_ID = 1;
+// TODO: The legacy programs use the seeded flat schema. Remove this gate
+// once they are migrated.
+const KNOWN_LEGACY_PROGRAM_IDS = new Set([1, 2, 4]);
+
+function isLegacyProgram(programId: number, accessibleSites: Site[]): boolean {
+    if (KNOWN_LEGACY_PROGRAM_IDS.has(programId)) {
+        return true;
+    }
+
+    return (
+        accessibleSites.length > 0 &&
+        accessibleSites.every(
+            site => Object.keys(site.locationHierarchy ?? {}).length === 0,
+        )
+    );
+}
 
 interface ProgramGateProps {
     skeleton: React.ReactNode;
-    ugandaFallback: React.ReactNode;
+    legacyFallback: React.ReactNode;
     children: (
         programId: number,
         permissions: UserPermissions,
@@ -19,7 +33,7 @@ interface ProgramGateProps {
 
 export default function ProgramGate({
     skeleton,
-    ugandaFallback,
+    legacyFallback,
     children,
 }: ProgramGateProps) {
     const {
@@ -44,8 +58,8 @@ export default function ProgramGate({
 
     const { programId, permissions } = getUserPermissionsResult.data;
 
-    if (programId === UGANDA_PROGRAM_ID) {
-        return ugandaFallback;
+    if (isLegacyProgram(programId, permissions.sites.canAccessSites)) {
+        return legacyFallback;
     }
 
     return children(programId, permissions);

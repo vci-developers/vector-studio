@@ -12,7 +12,7 @@ export const siteSchema = z.object({
     locationTypeId: z.number().nullable().optional(),
     name: z.string().nullable().optional(),
     parentId: z.number().nullable().optional(),
-    locationHierarchy: z.record(z.string(), z.string()),
+    locationHierarchy: z.record(z.string(), z.string()).optional(),
     isActive: z.boolean(),
     hasData: z.boolean().optional(),
 });

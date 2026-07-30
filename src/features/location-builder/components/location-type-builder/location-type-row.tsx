@@ -17,7 +17,7 @@ import { GripVertical, Loader2, Lock, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-interface LocationLevelRowProps {
+interface LocationTypeRowProps {
     locationType: LocationType;
     displayPosition: number;
     hasSites: boolean;
@@ -25,13 +25,13 @@ interface LocationLevelRowProps {
     onDeleteLocationType: (locationType: LocationType) => void;
 }
 
-export default function LocationLevelRow({
+export default function LocationTypeRow({
     locationType,
     displayPosition,
     hasSites,
     programId,
     onDeleteLocationType,
-}: LocationLevelRowProps) {
+}: LocationTypeRowProps) {
     const {
         mutate: updateLocationTypeForProgram,
         isPending: isUpdatingLocationTypeForProgram,
@@ -132,7 +132,6 @@ export default function LocationLevelRow({
                         event.currentTarget.blur();
                     } else if (event.key === 'Escape') {
                         setNameDraft(locationType.name);
-                        event.currentTarget.blur();
                     }
                 }}
                 disabled={isUpdatingLocationTypeForProgram}

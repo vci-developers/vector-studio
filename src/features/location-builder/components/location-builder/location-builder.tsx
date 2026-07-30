@@ -3,20 +3,23 @@
 import type { LocationType } from '@/api/location-type/contracts/location-type-schema';
 import { useGetLocationTypesByProgramId } from '@/api/location-type/hooks/use-get-location-types-by-program-id';
 import type { Site } from '@/api/site/contracts/site-schema';
-import { useMemo, useState } from 'react';
-import LocationBuilderSkeleton from '../loading/location-builder-skeleton';
+import { useState } from 'react';
 import ErrorBanner from '@/components/error/error-banner';
-import LocationLevelList from './location-level-list';
-import DeleteLocationLevelDialog from './delete-location-level-dialog';
+import LocationBuilderSkeleton from '@/features/location-builder/components/loading/location-builder-skeleton';
+import DeleteLocationTypeDialog from '@/features/location-builder/components/location-type-builder/delete-location-type-dialog';
+import LocationTypesList from '@/features/location-builder/components/location-type-builder/location-types-list';
+import SiteColumnView from '@/features/location-builder/components/site-builder/site-column-view';
 
 interface LocationBuilderProps {
     programId: number;
     accessibleSites: Site[];
+    canWriteSiteMetadata: boolean;
 }
 
 export default function LocationBuilder({
     programId,
     accessibleSites,
+    canWriteSiteMetadata,
 }: LocationBuilderProps) {
     const {
         data: getLocationTypesByProgramIdResult,
@@ -27,30 +30,22 @@ export default function LocationBuilder({
     const [locationTypePendingDeletion, setLocationTypePendingDeletion] =
         useState<LocationType | null>(null);
 
-    const locationTypesSortedByLevel = useMemo(() => {
-        if (!getLocationTypesByProgramIdResult?.ok) return [];
-        return [...getLocationTypesByProgramIdResult.data.locationTypes].sort(
-            (a, b) => a.level - b.level,
-        );
-    }, [getLocationTypesByProgramIdResult]);
+    const locationTypesSortedByLevel = getLocationTypesByProgramIdResult?.ok
+        ? [...getLocationTypesByProgramIdResult.data.locationTypes].sort(
+              (a, b) => a.level - b.level,
+          )
+        : [];
 
-    const firstLevelWithNoSitesIndex = useMemo(() => {
-        const occupiedLocationTypeIds = new Set(
-            accessibleSites
-                .map(site => site.locationTypeId)
-                .filter(
-                    (locationTypeId): locationTypeId is number =>
-                        locationTypeId != null,
-                ),
-        );
-
-        let levelIndex = 0;
-        for (const locationType of locationTypesSortedByLevel) {
-            if (!occupiedLocationTypeIds.has(locationType.id)) break;
-            levelIndex += 1;
-        }
-        return levelIndex;
-    }, [accessibleSites, locationTypesSortedByLevel]);
+    const occupiedLocationTypeIds = new Set(
+        accessibleSites.map(site => site.locationTypeId),
+    );
+    const firstUnoccupiedLevelIndex = locationTypesSortedByLevel.findIndex(
+        locationType => !occupiedLocationTypeIds.has(locationType.id),
+    );
+    const firstLevelWithNoSitesIndex =
+        firstUnoccupiedLevelIndex === -1
+            ? locationTypesSortedByLevel.length
+            : firstUnoccupiedLevelIndex;
 
     if (
         !getLocationTypesByProgramIdResult ||
@@ -71,13 +66,19 @@ export default function LocationBuilder({
 
     return (
         <div className="space-y-8">
-            <LocationLevelList
+            <LocationTypesList
                 programId={programId}
                 locationTypes={locationTypesSortedByLevel}
                 firstLevelWithNoSitesIndex={firstLevelWithNoSitesIndex}
                 onDeleteLocationType={setLocationTypePendingDeletion}
             />
-            <DeleteLocationLevelDialog
+            <SiteColumnView
+                programId={programId}
+                accessibleSites={accessibleSites}
+                orderedLocationTypes={locationTypesSortedByLevel}
+                canWriteSiteMetadata={canWriteSiteMetadata}
+            />
+            <DeleteLocationTypeDialog
                 locationType={locationTypePendingDeletion}
                 programId={programId}
                 onClose={() => setLocationTypePendingDeletion(null)}
