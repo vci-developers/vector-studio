@@ -77,9 +77,23 @@ export default function PublishSheet({
     const isVersionAlreadyUsed =
         previouslyPublishedForms !== null &&
         alreadyPublishedVersionSet.has(trimmedVersion);
+
+    const rootQuestions = draftForm.questions ?? [];
+    const draftHasUnitQuestion = rootQuestions.some(
+        question => question.answerScope === 'SESSION_UNIT',
+    );
+    const draftHasUnitIdentityComponent = rootQuestions.some(
+        question =>
+            question.answerScope === 'SESSION_UNIT' &&
+            question.isUnitIdentityComponent,
+    );
+    const isMissingUnitIdentity =
+        draftHasUnitQuestion && !draftHasUnitIdentityComponent;
+
     const isPublishDisabled =
         isVersionEmpty ||
         isVersionAlreadyUsed ||
+        isMissingUnitIdentity ||
         isPublishDraftFormForProgramPending;
 
     const currentPublishedForm = getCurrentPublishedFormResult?.ok
@@ -227,6 +241,14 @@ export default function PublishSheet({
                             </FieldError>
                         )}
                     </Field>
+                    {isMissingUnitIdentity && (
+                        <p className="text-destructive text-sm">
+                            This form has per-collection batch questions but no
+                            identifying question. Mark at least one
+                            per-collection batch question as identifying before
+                            you can publish.
+                        </p>
+                    )}
                     <div className="flex justify-end gap-2">
                         <Button
                             type="button"

@@ -1,6 +1,9 @@
 'use client';
 
-import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
+import type {
+    FormQuestion,
+    FormQuestionScope,
+} from '@/api/form-question/contracts/form-question-schema';
 import { useGetDraftFormByProgramId } from '@/api/form/hooks/use-get-draft-form-by-program-id';
 import { useState } from 'react';
 import DraftEditorSkeleton from '../loading/draft-editor-skeleton';
@@ -28,6 +31,8 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
     const [parentIdForNewQuestion, setParentIdForNewQuestion] = useState<
         number | null
     >(null);
+    const [answerScopeForNewQuestion, setAnswerScopeForNewQuestion] =
+        useState<FormQuestionScope>('SESSION');
     const [questionPendingDeletion, setQuestionPendingDeletion] =
         useState<FormQuestion | null>(null);
     const [isPublishSheetOpen, setIsPublishSheetOpen] = useState(false);
@@ -59,8 +64,9 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
             />
             <QuestionList
                 draft={draft}
-                onAddQuestion={parentId => {
+                onAddQuestion={(parentId, answerScope) => {
                     setParentIdForNewQuestion(parentId);
+                    setAnswerScopeForNewQuestion(answerScope);
                     setIsAddQuestionSheetOpen(true);
                 }}
                 onEditQuestion={setQuestionBeingEdited}
@@ -70,6 +76,7 @@ export default function DraftEditor({ programId }: DraftEditorProps) {
                 questionBeingEdited={questionBeingEdited}
                 isAddQuestionSheetOpen={isAddQuestionSheetOpen}
                 parentIdForNewQuestion={parentIdForNewQuestion}
+                answerScopeForNewQuestion={answerScopeForNewQuestion}
                 programId={programId}
                 draft={draft}
                 onClose={() => {

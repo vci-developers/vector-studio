@@ -1,6 +1,9 @@
 'use client';
 
-import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
+import type {
+    FormQuestion,
+    FormQuestionScope,
+} from '@/api/form-question/contracts/form-question-schema';
 import type { PrerequisiteExpression } from '@/api/form-question/contracts/prerequisite-expression-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 import {
@@ -16,6 +19,7 @@ import PrerequisiteNodeEditor from './prerequisite-node-editor';
 interface PrerequisiteEditorProps {
     draft: Form;
     questionBeingEdited: FormQuestion | null;
+    answerScope: FormQuestionScope;
     prerequisiteExpression: PrerequisiteExpression | null;
     onPrerequisiteExpressionChange: (
         nextExpression: PrerequisiteExpression | null,
@@ -25,13 +29,17 @@ interface PrerequisiteEditorProps {
 export default function PrerequisiteEditor({
     draft,
     questionBeingEdited,
+    answerScope,
     prerequisiteExpression,
     onPrerequisiteExpressionChange,
 }: PrerequisiteEditorProps) {
     const excludedQuestionId = questionBeingEdited?.id ?? null;
     const referencableQuestions: FormQuestion[] = [];
     walkQuestions(draft.questions, question => {
-        if (question.id !== excludedQuestionId) {
+        if (
+            question.id !== excludedQuestionId &&
+            question.answerScope === answerScope
+        ) {
             referencableQuestions.push(question);
         }
     });

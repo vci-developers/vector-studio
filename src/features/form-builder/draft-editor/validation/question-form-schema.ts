@@ -6,12 +6,18 @@ export const questionFormSchema = z
         label: z.string().trim().min(1, 'Question text is required'),
         type: z.enum(['text', 'number', 'boolean', 'select', 'date']),
         required: z.boolean(),
+        isUnitIdentityComponent: z.boolean(),
         options: z.array(z.string().trim().min(1, 'Option text is required')),
         prerequisite: prerequisiteExpressionSchema.nullable(),
     })
     .refine(data => data.type !== 'select' || data.options.length > 0, {
         path: ['options'],
         message: 'Add at least one option for a dropdown question.',
+    })
+    .refine(data => !data.isUnitIdentityComponent || data.required, {
+        path: ['required'],
+        message:
+            'A question that identifies a collection batch must always be answered.',
     });
 
 export type QuestionFormInput = z.infer<typeof questionFormSchema>;

@@ -1,6 +1,9 @@
 'use client';
 
-import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
+import type {
+    FormQuestion,
+    FormQuestionScope,
+} from '@/api/form-question/contracts/form-question-schema';
 import type { Form } from '@/api/form/contracts/form-schema';
 import {
     Sheet,
@@ -15,6 +18,7 @@ interface QuestionFormSheetProps {
     questionBeingEdited: FormQuestion | null;
     isAddQuestionSheetOpen: boolean;
     parentIdForNewQuestion: number | null;
+    answerScopeForNewQuestion: FormQuestionScope;
     programId: number;
     draft: Form;
     onClose: () => void;
@@ -24,6 +28,7 @@ export default function QuestionFormSheet({
     questionBeingEdited,
     isAddQuestionSheetOpen,
     parentIdForNewQuestion,
+    answerScopeForNewQuestion,
     programId,
     draft,
     onClose,
@@ -44,7 +49,9 @@ export default function QuestionFormSheet({
                             ? 'Edit question'
                             : parentIdForNewQuestion !== null
                               ? 'Add follow-up question'
-                              : 'Add question'}
+                              : answerScopeForNewQuestion === 'SESSION_UNIT'
+                                ? 'Add per-collection question'
+                                : 'Add session question'}
                     </SheetTitle>
                     <SheetDescription>
                         {questionBeingEdited
@@ -63,6 +70,7 @@ export default function QuestionFormSheet({
                         draft={draft}
                         questionBeingEdited={questionBeingEdited}
                         parentIdForNewQuestion={parentIdForNewQuestion}
+                        answerScopeForNewQuestion={answerScopeForNewQuestion}
                         onClose={onClose}
                     />
                 )}

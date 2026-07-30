@@ -2,6 +2,7 @@ import type { Form } from '@/api/form/contracts/form-schema';
 import type { QuestionDiff } from '../../utils/form-version-diff';
 import { Card } from '@/components/ui/card';
 import DiffQuestionPair from './diff-question-pair';
+import type { FormQuestionScope } from '@/api/form-question/contracts/form-question-schema';
 
 interface DiffQuestionListProps {
     questionDiffs: QuestionDiff[];
@@ -28,6 +29,29 @@ export default function DiffQuestionList({
         );
     }
 
+    function resolveDiffScope(questionDiff: QuestionDiff): FormQuestionScope {
+        const question = questionDiff.toQuestion ?? questionDiff.fromQuestion;
+        return question!.answerScope;
+    }
+
+    const scopeSections = [
+        {
+            scope: 'SESSION' as const,
+            title: 'Session questions',
+            diffs: questionDiffs.filter(
+                questionDiff => resolveDiffScope(questionDiff) === 'SESSION',
+            ),
+        },
+        {
+            scope: 'SESSION_UNIT' as const,
+            title: 'Per-collection batch questions',
+            diffs: questionDiffs.filter(
+                questionDiff =>
+                    resolveDiffScope(questionDiff) === 'SESSION_UNIT',
+            ),
+        },
+    ].filter(section => section.diffs.length > 0);
+
     return (
         <Card className="gap-0 p-5">
             <div className="relative">
@@ -36,15 +60,24 @@ export default function DiffQuestionList({
                     <div className="text-foreground">{fromColumnLabel}</div>
                     <div className="text-foreground">{toColumnLabel}</div>
                 </div>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    {questionDiffs.map(questionDiff => (
-                        <DiffQuestionPair
-                            key={`${questionDiff.kind}-${questionDiff.toQuestion?.id ?? questionDiff.fromQuestion?.id}`}
-                            questionDiff={questionDiff}
-                            fromForm={fromForm}
-                            toForm={toForm}
-                            depth={0}
-                        />
+                <div className="space-y-6">
+                    {scopeSections.map(section => (
+                        <div key={section.scope}>
+                            <div className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                                {section.title}
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                {section.diffs.map(questionDiff => (
+                                    <DiffQuestionPair
+                                        key={`${questionDiff.kind}-${questionDiff.toQuestion?.id ?? questionDiff.fromQuestion?.id}`}
+                                        questionDiff={questionDiff}
+                                        fromForm={fromForm}
+                                        toForm={toForm}
+                                        depth={0}
+                                    />
+                                ))}
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>

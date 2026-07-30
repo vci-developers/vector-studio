@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
     formQuestionSchema,
+    formQuestionScopeSchema,
     formQuestionTypeSchema,
 } from './form-question-schema';
 import { prerequisiteExpressionSchema } from './prerequisite-expression-schema';
@@ -12,6 +13,8 @@ export const putQuestionToDraftFormRequestSchema = z
         required: z.boolean(),
         parentId: z.number().nullable(),
         options: z.array(z.string()).nullable(),
+        answerScope: formQuestionScopeSchema,
+        isUnitIdentityComponent: z.boolean(),
         order: z.number(),
         prerequisite: prerequisiteExpressionSchema.nullable(),
     })

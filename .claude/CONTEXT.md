@@ -112,3 +112,116 @@ are hierarchical.
   occupied in a tree they cannot see. Delete is backstopped by the backend
   block; the airtight fix for reorder (a program-wide per-Level Site count, or
   confirmed full visibility) is deferred — see ADR 0001.
+
+## Forms & Sessions
+
+### Language
+
+**Session**: A single field-collection event tied to one Site (e.g. one
+household visit). The unit that carries Form Answers.
+
+**Form Mode**: Which form system a Program uses — **exclusive per program, one
+mode at a time**. **Surveillance Form** (legacy, e.g. Uganda) is a fixed-schema
+form with a hardcoded field set. **Dynamic Form** is a versioned, admin-defined
+question set built in the form builder. Mode is detected by the current-form
+endpoint (`not_found` ⇒ Surveillance), **never by hardcoding country**. _Avoid_:
+"custom form"; "legacy vs new" when precision matters.
+
+The **form builder targets Dynamic Form programs**; the per-unit section rides
+inside it and needs no gate of its own. Today **Uganda (id 1) is the sole
+legacy/Surveillance program** (migration pending) and **every other and future
+program is Dynamic**, so the Dynamic set is "all programs but Uganda" in
+practice — but detection stays via the current-form endpoint, never a hardcoded
+id.
+
+**Session Unit**: A repeated collection sub-unit within a single Session (e.g. a
+trap or room visited within one household visit). Carries no intrinsic semantic
+identity fields — the mobile app guarantees distinct units within one Session.
+**Session Units exist only under Dynamic Form programs** (Surveillance/legacy
+programs have none). _Avoid_: sub-session, repeat, group.
+
+**UI language: a Session Unit is surfaced to admins as a "collection".** Because
+"unit" reads as jargon, all user-facing text calls it a **collection** (e.g.
+"Per-collection questions", "answered again for each collection — each trap,
+room, or HLC hour"). This is **presentation-only**: **code, schemas, query
+params, and this glossary keep `Session Unit` / `unit` / `SESSION_UNIT` /
+`isUnitIdentityComponent`**. Rule of thumb — `collection` appears **only inside
+a user-facing string literal**; identifiers never use it. Every downstream step
+follows the split: the screen says "collection", the code says "unit".
+
+**"order" is overloaded — two distinct fields.** A Session Unit's
+**`unitOrder`** is the _runtime_ sequence in which units were collected within
+one Session (set by mobile, never touched by the builder). A Form Question's
+**`order`** is the _authoring_ sequence of questions in the form definition.
+They are unrelated; the builder configures the latter only. The field app
+renders `SESSION` and `SESSION_UNIT` questions on **separate screens**, so their
+`order` sequences never interleave at collection time.
+
+**Form Answer Scope** (`answerScope` on a Form Question): either `SESSION` (one
+answer per Session) or `SESSION_UNIT` (one answer per Session Unit). Set by the
+admin when authoring a question in the form builder; the review layer later
+resolves a `SESSION` answer's conflicts against `sessionIds`, a `SESSION_UNIT`
+answer's against `sessionUnitIds`. _Avoid_: "question level/type" (collides with
+the question's answer `type`).
+
+**Unit Identity**: The set of a Session Unit's `SESSION_UNIT`-scoped questions
+flagged `isUnitIdentityComponent: true`. Their combined answer values
+**identify** the unit and are used to match the "same" unit across Sessions in a
+Review Unit (group by the identity-value tuple). Shown as the unit's
+**header/title**, never as resolvable conflict rows. Non-identity `SESSION_UNIT`
+answers are the resolvable rows. _Avoid_: unit key, unit name.
+
+### Invariants
+
+- **A `SESSION` question is the default and backward-compatible.** Every
+  existing question is `SESSION`-scoped; a new question defaults to `SESSION`.
+- **Scope is immutable after creation.** A question's `answerScope` is fixed by
+  the section it is created in and can never be edited; there is no cross-scope
+  move. To "change" a question's scope, the admin deletes the tree and recreates
+  it in the other section. This deliberately avoids the recursive cross-scope
+  cascade (subtree re-scoping, identity clearing, prerequisite pruning) and its
+  partial-failure risk. The scope selector therefore lives **only in the
+  add-question flow** (implied by section); the edit sheet never shows it.
+- **Identity components must be `required`.** Any question with
+  `isUnitIdentityComponent: true` must have `required: true` — an identity field
+  that could be left blank cannot identify a unit.
+- **`isUnitIdentityComponent` is only meaningful on `SESSION_UNIT` questions.**
+  A `SESSION` question is never an identity component.
+- **Identity is toggled only on a root question** (`parentId === null`) and
+  **inherits down the whole subtree** — parallel to scope. A follow-up never
+  carries its own identity toggle; it is an identity component **iff its root
+  is**. So there are no "identity islands": a non-identity root's subtree is
+  entirely non-identity, an identity root's subtree is entirely identity. This
+  inheritance is what makes **branch-specific composite identity** possible: an
+  identity root with options A/B whose A-branch follow-ups are C, D and whose
+  B-branch follow-up is E yields units keyed **AC / AD / BE**, not just **A /
+  B**. Without it, two distinct units (AC and AD) collapse to the same key "A"
+  and — since there is one form per unit — one is lost.
+- **An identity root may not have a visibility rule (narrow rule).** In this
+  builder, nesting (`parentId`) and visibility (`prerequisite`) are
+  **independent axes** — "root" means `parentId === null`, _not_ "always shown";
+  a root question _can_ be given a visibility rule. If an identity root were
+  conditional, units failing its rule would get an empty, ungroupable identity.
+  So marking a question as identity **bars a visibility rule on it** (the
+  builder disables/clears the prerequisite editor). Only identity roots are
+  constrained this way; **non-identity roots keep the freedom to be
+  conditional** (unchanged from VCV-209). Branches _below_ the identity root
+  branch freely and remain conditional — that is the AC/AD/BE machinery.
+- **Required bites only when visible.** An identity component is `required`, but
+  a branch follow-up (e.g. C, shown only when the parent = A) is enforced only
+  for units that took that branch. A unit's **identity tuple** is the set of
+  identity answers it actually has, so it varies by branch; two units are "the
+  same" iff their tuples match.
+- **A form that has any `SESSION_UNIT` question must have ≥1 identity
+  component.** The degenerate case — a single `SESSION_UNIT` question — is
+  itself the identity component. As unit questions are added, the admin chooses
+  which identity subtree(s) form the identity; the review layer keys on the
+  resulting tuple.
+- **Prerequisites never cross scope.** A question's visibility rule may only
+  reference questions of the **same** `answerScope` — `SESSION` references
+  `SESSION`, `SESSION_UNIT` references `SESSION_UNIT`. The asymmetric relaxation
+  (letting a `SESSION_UNIT` question depend on a `SESSION` answer, which is
+  well-defined since a session answer is shared by every unit) is **deliberately
+  deferred** until a real form needs it; a `SESSION` question depending on a
+  `SESSION_UNIT` answer stays permanently forbidden (ill-defined — "which unit's
+  answer?").

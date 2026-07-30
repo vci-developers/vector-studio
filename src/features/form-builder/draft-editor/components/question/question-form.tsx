@@ -1,6 +1,9 @@
 'use client';
 
-import type { FormQuestion } from '@/api/form-question/contracts/form-question-schema';
+import type {
+    FormQuestion,
+    FormQuestionScope,
+} from '@/api/form-question/contracts/form-question-schema';
 import { usePostQuestionToDraftForm } from '@/api/form-question/hooks/use-post-question-to-draft-form';
 import { usePutQuestionToDraftForm } from '@/api/form-question/hooks/use-put-question-to-draft-form';
 import type { Form } from '@/api/form/contracts/form-schema';
@@ -41,6 +44,8 @@ import PrerequisiteEditor from '../prerequisite/prerequisite-editor';
 import { QUESTION_TYPE_LABELS } from '@/features/form-builder/utils/question-type-labels';
 import type { Result } from '@/lib/result/result';
 import { simplifyPrerequisiteExpression } from '@/features/form-builder/utils/prerequisite';
+import { walkQuestions } from '@/features/form-builder/utils/walk-questions';
+import { Badge } from '@/components/ui/badge';
 
 const QUESTION_FORM_ID = 'question-form';
 
@@ -49,6 +54,7 @@ interface QuestionFormProps {
     draft: Form;
     questionBeingEdited: FormQuestion | null;
     parentIdForNewQuestion: number | null;
+    answerScopeForNewQuestion: FormQuestionScope;
     onClose: () => void;
 }
 
@@ -57,6 +63,7 @@ export default function QuestionForm({
     draft,
     questionBeingEdited,
     parentIdForNewQuestion,
+    answerScopeForNewQuestion,
     onClose,
 }: QuestionFormProps) {
     const {
@@ -68,43 +75,112 @@ export default function QuestionForm({
         isPending: isUpdateQuestionInDraftFormPending,
     } = usePutQuestionToDraftForm();
 
+    const isEditing = questionBeingEdited !== null;
+
+    const answerScope = isEditing
+        ? questionBeingEdited.answerScope
+        : answerScopeForNewQuestion;
+    const isRootQuestion = isEditing
+        ? questionBeingEdited.parentId === null
+        : parentIdForNewQuestion === null;
+    const isSessionUnitScopedQuestion = answerScope === 'SESSION_UNIT';
+
+    const identityRootQuestions = (draft.questions ?? []).filter(
+        question =>
+            question.answerScope === 'SESSION_UNIT' &&
+            question.isUnitIdentityComponent,
+    );
+
+    let inheritedFollowUpIdentity = false;
+    if (!isEditing && parentIdForNewQuestion !== null) {
+        walkQuestions(draft.questions, question => {
+            if (question.id === parentIdForNewQuestion) {
+                inheritedFollowUpIdentity = question.isUnitIdentityComponent;
+            }
+        });
+    }
+
+    const defaultIsUnitIdentityComponent = isEditing
+        ? questionBeingEdited.isUnitIdentityComponent
+        : parentIdForNewQuestion !== null
+          ? inheritedFollowUpIdentity
+          : isSessionUnitScopedQuestion && identityRootQuestions.length === 0;
+    const defaultRequired = isEditing
+        ? questionBeingEdited.required
+        : defaultIsUnitIdentityComponent;
+
     const questionForm = useForm<QuestionFormInput>({
         resolver: zodResolver(questionFormSchema),
-        defaultValues: questionBeingEdited
-            ? {
-                  label: questionBeingEdited.label,
-                  type: questionBeingEdited.type,
-                  required: questionBeingEdited.required,
-                  options: questionBeingEdited.options ?? [],
-                  prerequisite: simplifyPrerequisiteExpression(
+        defaultValues: {
+            label: questionBeingEdited?.label ?? '',
+            type: questionBeingEdited?.type ?? 'text',
+            required: defaultRequired,
+            isUnitIdentityComponent: defaultIsUnitIdentityComponent,
+            options: questionBeingEdited?.options ?? [],
+            prerequisite: questionBeingEdited
+                ? simplifyPrerequisiteExpression(
                       questionBeingEdited.prerequisite,
-                  ),
-              }
-            : {
-                  label: '',
-                  type: 'text',
-                  required: false,
-                  options: [],
-                  prerequisite: null,
-              },
+                  )
+                : null,
+        },
     });
     const selectedQuestionType = useWatch({
         control: questionForm.control,
         name: 'type',
     });
+    const isUnitIdentityComponent = useWatch({
+        control: questionForm.control,
+        name: 'isUnitIdentityComponent',
+    });
+
+    const showIdentityToggle = isSessionUnitScopedQuestion && isRootQuestion;
+    const showInheritedIdentityIndicator =
+        isSessionUnitScopedQuestion &&
+        !isRootQuestion &&
+        isUnitIdentityComponent;
+
+    const isRequiredLocked = isUnitIdentityComponent;
+    const isIdentityRoot = showIdentityToggle && isUnitIdentityComponent;
+
+    const otherIdentityRootCount = identityRootQuestions.filter(
+        question => question.id !== questionBeingEdited?.id,
+    ).length;
+    const isLastIdentityRoot =
+        showIdentityToggle &&
+        isEditing &&
+        questionBeingEdited.isUnitIdentityComponent &&
+        otherIdentityRootCount === 0;
+
+    function handleIdentityToggleChange(nextIsUnitIdentityComponent: boolean) {
+        questionForm.setValue(
+            'isUnitIdentityComponent',
+            nextIsUnitIdentityComponent,
+            { shouldValidate: true },
+        );
+        if (nextIsUnitIdentityComponent) {
+            questionForm.setValue('required', true, { shouldValidate: true });
+            questionForm.setValue('prerequisite', null);
+        }
+    }
 
     const isSubmitting =
         isCreateQuestionInDraftFormPending ||
         isUpdateQuestionInDraftFormPending;
 
     function onSubmit(values: QuestionFormInput) {
-        const isEditing = questionBeingEdited !== null;
         const errorTitle = isEditing
             ? "Couldn't save the question"
             : "Couldn't add the question";
         const successMessage = isEditing ? 'Question saved' : 'Question added';
-        const normalizedOptions =
-            values.type === 'select' ? values.options : null;
+
+        const questionRequestFields = {
+            label: values.label,
+            type: values.type,
+            required: values.required,
+            isUnitIdentityComponent: values.isUnitIdentityComponent,
+            options: values.type === 'select' ? values.options : null,
+            prerequisite: values.prerequisite,
+        };
 
         function handleMutationResult(result: Result<unknown, NetworkError>) {
             if (!result.ok) {
@@ -123,18 +199,12 @@ export default function QuestionForm({
             });
         }
 
-        if (isEditing) {
+        if (questionBeingEdited !== null) {
             updateQuestionInDraftForm(
                 {
                     programId,
                     questionId: questionBeingEdited.id,
-                    requestBody: {
-                        label: values.label,
-                        type: values.type,
-                        required: values.required,
-                        options: normalizedOptions,
-                        prerequisite: values.prerequisite,
-                    },
+                    requestBody: questionRequestFields,
                 },
                 {
                     onSuccess: handleMutationResult,
@@ -148,13 +218,10 @@ export default function QuestionForm({
             {
                 programId,
                 requestBody: {
-                    label: values.label,
-                    type: values.type,
-                    required: values.required,
+                    ...questionRequestFields,
                     parentId: parentIdForNewQuestion,
-                    options: normalizedOptions,
+                    answerScope: answerScopeForNewQuestion,
                     order: getNextQuestionOrder(draft),
-                    prerequisite: values.prerequisite,
                 },
             },
             { onSuccess: handleMutationResult, onError: handleNetworkError },
@@ -252,6 +319,50 @@ export default function QuestionForm({
                                 )}
                             />
                         )}
+                        {showIdentityToggle && (
+                            <Controller
+                                name="isUnitIdentityComponent"
+                                control={questionForm.control}
+                                render={({ field }) => (
+                                    <Field orientation="horizontal">
+                                        <div className="flex-1">
+                                            <FieldLabel htmlFor="question-form-identity">
+                                                Identifies this collection
+                                            </FieldLabel>
+                                            <FieldDescription>
+                                                {isLastIdentityRoot
+                                                    ? 'This is the only identifying question. A form with per-collection catch questions needs at least one — mark another as identifying before turning this off.'
+                                                    : 'Its answers — and those of its follow-ups — tell one collection batch apart from another across visits. Always shown and always required.'}
+                                            </FieldDescription>
+                                        </div>
+                                        <Switch
+                                            id="question-form-identity"
+                                            checked={field.value}
+                                            onCheckedChange={
+                                                handleIdentityToggleChange
+                                            }
+                                            disabled={isLastIdentityRoot}
+                                        />
+                                    </Field>
+                                )}
+                            />
+                        )}
+                        {showInheritedIdentityIndicator && (
+                            <Field orientation="horizontal">
+                                <div className="flex-1">
+                                    <FieldLabel>
+                                        Part of collection identity
+                                    </FieldLabel>
+                                    <FieldDescription>
+                                        This follow-up inherits identity from
+                                        its identifying parent, so it helps tell
+                                        collections apart and is always
+                                        required.
+                                    </FieldDescription>
+                                </div>
+                                <Badge variant="secondary">Identity</Badge>
+                            </Field>
+                        )}
                         <Controller
                             name="required"
                             control={questionForm.control}
@@ -262,41 +373,47 @@ export default function QuestionForm({
                                             Required
                                         </FieldLabel>
                                         <FieldDescription>
-                                            Field workers cannot submit the
-                                            session without answering this.
+                                            {isRequiredLocked
+                                                ? 'This question identifies the collection, so field workers must always answer it.'
+                                                : 'Field workers cannot submit the session without answering this.'}
                                         </FieldDescription>
                                     </div>
                                     <Switch
                                         id="question-form-required"
                                         checked={field.value}
                                         onCheckedChange={field.onChange}
+                                        disabled={isRequiredLocked}
                                     />
                                 </Field>
                             )}
                         />
-                        <Controller
-                            name="prerequisite"
-                            control={questionForm.control}
-                            render={({ field }) => (
-                                <Field>
-                                    <FieldLabel>Visibility rule</FieldLabel>
-                                    <FieldDescription>
-                                        Hide this question unless answers to
-                                        other questions match the rule below.
-                                    </FieldDescription>
-                                    <PrerequisiteEditor
-                                        draft={draft}
-                                        questionBeingEdited={
-                                            questionBeingEdited
-                                        }
-                                        prerequisiteExpression={field.value}
-                                        onPrerequisiteExpressionChange={
-                                            field.onChange
-                                        }
-                                    />
-                                </Field>
-                            )}
-                        />
+                        {!isIdentityRoot && (
+                            <Controller
+                                name="prerequisite"
+                                control={questionForm.control}
+                                render={({ field }) => (
+                                    <Field>
+                                        <FieldLabel>Visibility rule</FieldLabel>
+                                        <FieldDescription>
+                                            Hide this question unless answers to
+                                            other questions match the rule
+                                            below.
+                                        </FieldDescription>
+                                        <PrerequisiteEditor
+                                            draft={draft}
+                                            questionBeingEdited={
+                                                questionBeingEdited
+                                            }
+                                            answerScope={answerScope}
+                                            prerequisiteExpression={field.value}
+                                            onPrerequisiteExpressionChange={
+                                                field.onChange
+                                            }
+                                        />
+                                    </Field>
+                                )}
+                            />
+                        )}
                     </FieldGroup>
                 </form>
             </div>

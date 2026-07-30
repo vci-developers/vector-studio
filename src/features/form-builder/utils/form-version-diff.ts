@@ -20,6 +20,7 @@ export type QuestionDiff = {
         label?: { from: string; to: string };
         type?: { from: FormQuestionType; to: FormQuestionType };
         required?: { from: boolean; to: boolean };
+        isUnitIdentityComponent?: { from: boolean; to: boolean };
         options?: { added: string[]; removed: string[] };
         prerequisite?: {
             from: PrerequisiteExpression | null;
@@ -180,10 +181,25 @@ export function computeFormVersionDiff(fromForm: Form, toForm: Form) {
         return siblingDiffs;
     }
 
-    const questionDiffs = buildSiblingDiffs(
-        fromForm.questions,
-        toForm.questions,
+    const fromRootQuestions = fromForm.questions ?? [];
+    const toRootQuestions = toForm.questions ?? [];
+
+    const sessionQuestionDiffs = buildSiblingDiffs(
+        fromRootQuestions.filter(
+            question => question.answerScope === 'SESSION',
+        ),
+        toRootQuestions.filter(question => question.answerScope === 'SESSION'),
     );
+    const unitQuestionDiffs = buildSiblingDiffs(
+        fromRootQuestions.filter(
+            question => question.answerScope === 'SESSION_UNIT',
+        ),
+        toRootQuestions.filter(
+            question => question.answerScope === 'SESSION_UNIT',
+        ),
+    );
+
+    const questionDiffs = [...sessionQuestionDiffs, ...unitQuestionDiffs];
     return { questionDiffs, summary: diffSummary };
 }
 
@@ -221,6 +237,15 @@ function computeFieldChanges(
         fieldChanges.required = {
             from: fromQuestion.required,
             to: toQuestion.required,
+        };
+    }
+    if (
+        fromQuestion.isUnitIdentityComponent !==
+        toQuestion.isUnitIdentityComponent
+    ) {
+        fieldChanges.isUnitIdentityComponent = {
+            from: fromQuestion.isUnitIdentityComponent,
+            to: toQuestion.isUnitIdentityComponent,
         };
     }
 
